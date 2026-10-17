@@ -1,0 +1,19 @@
+{
+  "Assets/_Project/Core/Presentation/Fonts/Baloo2/Baloo2-Bold SDF.asset": "e67a7ac40422e41088ec3c9ec48481ff",
+  "Assets/_Project/Core/Presentation/Fonts/ChakraPetch/ChakraPetch-Bold SDF.asset": "776410391df6b41ba943dc2ef14b627c",
+  "Assets/_Project/Core/Presentation/Fonts/Exo2/Exo2-Regular SDF.asset": "1bdab74523302412b9b6eb5d293bc055",
+  "Assets/_Project/Core/Presentation/Fonts/Inter/Inter-Regular SDF.asset": "73086bebd8b5e43d6b4d8f0cbf7fc2bc",
+  "Assets/_Project/Core/Presentation/Fonts/Montserrat/Montserrat-Bold SDF.asset": "2ba0e5debb44b4e10b310dfa1bdfa3ea",
+  "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Bold SDF.asset": "3d0e045c2e1264370838bc1b193896d5",
+  "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset": "5d07b897bcd4743879c3e7f554e0cd77",
+  "Assets/_Project/Core/Presentation/Fonts/Outfit/Outfit-Bold SDF.asset": "cdc57af4120f84337bed141d1fd1d329",
+  "Assets/_Project/Core/Presentation/Fonts/Rubik/Rubik-Bold SDF.asset": "3bb55ce064fb44ff2a5721d2cb02f06f",
+  "Assets/_Project/Core/Presentation/Theme/Post/bold.asset": "289f3088d4a784e818720465a90c5dfa",
+  "Assets/_Project/Core/Presentation/Theme/Post/bright.asset": "58a524e5e675c4f06a9ab2d6322e850e",
+  "Assets/_Project/Core/Presentation/Theme/Post/clean.asset": "d55fcc2f7b27441ca9a88abda89bf6e2",
+  "Assets/_Project/Core/Presentation/Theme/Post/nature.asset": "ce1c2dfbbda83466bb857497b4070b5f",
+  "Assets/_Project/Core/Presentation/Theme/Post/neon.asset": "b0b7aaf96045f4aa68fd16e24af2b909",
+  "Assets/_Project/Core/Presentation/Theme/Post/pastel.asset": "2981ecf0b2e3045d3834abf3030ce273",
+  "Assets/_Project/Core/Presentation/Palette.cs": "f440e744d6a474ea1953bd90765cd54b",
+  "Assets/_Project/Core/Presentation/ThemeStyle.cs": "83edc961561242848ac4b6707b78488e"
+}

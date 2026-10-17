@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs-extra');
 const path = require('path');
-const { seedGameTemplate } = require('./support/seedGameTemplate');
+const { seedGameTemplate, THEME_ASSETS } = require('./support/seedGameTemplate');
 const { tmpDir } = require('./support/gameFixtures');
 const { validateGame } = require('../src/game/validate');
 const { generateGame } = require('../src/game/generate');
@@ -36,9 +36,9 @@ const value = (input) => {
 };
 const exists = (dir, rel) => fs.pathExists(path.join(dir, rel));
 
-async function seeded(t, { legacyCi = false } = {}) {
+async function seeded(t, { legacyCi = false, themes = false } = {}) {
     const dir = await tmpDir(t);
-    await seedGameTemplate(dir, { full: true, legacyCi });
+    await seedGameTemplate(dir, { full: true, legacyCi, themes });
     // A cache's markers and Unity's local state, which never reach the project
     await fs.outputFile(path.join(dir, '.template-ref'), 'game-template-test\n');
     await fs.outputFile(path.join(dir, '.template-commit'), 'abc123\n');
@@ -92,6 +92,7 @@ test('blank with a module and no flags: the module stays, every flag part goes, 
     assert.deepEqual(result, {
         templateType: 'blank', render: '2d', flags: [], features: ['shop'],
         ids: { admob: 'off', revenueCat: 'off', gameServices: 'off' },
+        theme: null,
         warnings: [W.unity]
     });
 });
@@ -186,7 +187,8 @@ test('pins.game names the game template repo', () => {
 
 test('the game index exposes the pipeline and its parts', () => {
     for (const name of ['validateGame', 'generateGame', 'describeGame', 'GAME_SCHEMA', 'gameContractVersion', 'cloneModules',
-        'applyGameIdentity', 'writeGameIds', 'applyGameReadme', 'buildGameRecord', 'writeGameRecord', 'verifyGameProject']) {
+        'applyGameIdentity', 'writeGameIds', 'applyGameReadme', 'buildGameRecord', 'writeGameRecord', 'verifyGameProject',
+        'readThemes', 'validateTheme', 'applyTheme', 'derivePalette']) {
         assert.ok(game[name] !== undefined, name);
     }
     assert.equal(game.generateGame, generateGame);
@@ -204,4 +206,64 @@ test('a build scene the template lists but does not have is dropped from the bui
     const after = await fs.readFile(scenes, 'utf8');
     assert.ok(!after.includes('Gone.unity'));
     assert.ok(!after.includes('e7'.repeat(16)));
+});
+
+const readRecord = async (dir) => JSON.parse(await fs.readFile(path.join(dir, '.cmpose/generation.json'), 'utf8'));
+const themeAssets = (dir) => Promise.all(Object.values(THEME_ASSETS).map((rel) => fs.readFile(path.join(dir, rel), 'utf8')));
+
+test('no theme asked: the template default (clean) is applied, its three assets byte-identical, the record names it', async (t) => {
+    const dir = await seeded(t, { themes: true });
+    const before = await themeAssets(dir);
+    const result = await generateGame(value({ templateType: 'showcase' }), { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW });
+    // Only the identity step's namespace rename touches them
+    assert.deepEqual(await themeAssets(dir), before.map((text) => text.replaceAll('Kturker.UnityBase', 'Acme.SkyHopper')));
+    assert.deepEqual(result.theme, { family: 'clean', fontPair: 'outfit-inter' });
+    assert.deepEqual((await readRecord(dir)).theme, { family: 'clean', fontPair: 'outfit-inter' });
+    // themes.json stays in the project (the generator applied it; the template documents it)
+    assert.ok(await exists(dir, '.cmpose/themes.json'));
+});
+
+test('neon with uiTheme on: both palettes are written, the record and result carry the theme', async (t) => {
+    const dir = await seeded(t, { themes: true });
+    const before = await themeAssets(dir);
+    const v = value({ templateType: 'showcase', theme: { family: 'neon', primary: '#e91e63' } });
+    const result = await generateGame(v, { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW });
+    const after = await themeAssets(dir);
+    for (let i = 0; i < after.length; i++) assert.notEqual(after[i], before[i], Object.values(THEME_ASSETS)[i]);
+    assert.match(await fs.readFile(path.join(dir, THEME_ASSETS.style), 'utf8'), /^  familyId: neon$/m);
+    const theme = { family: 'neon', primary: '#E91E63', fontPair: 'chakrapetch-exo2' };
+    assert.deepEqual(result.theme, theme);
+    assert.deepEqual((await readRecord(dir)).theme, theme);
+    assert.deepEqual(result.warnings, [W.admob, W.revenueCat, W.gameServices, W.unity]);
+});
+
+test('uiTheme off: the flag removed Dark.asset and the theme step does not bring it back', async (t) => {
+    const dir = await seeded(t, { themes: true });
+    const result = await generateGame(value({ templateType: 'blank', flags: [], theme: { family: 'bold' } }),
+        { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW });
+    assert.equal(await exists(dir, THEME_ASSETS.dark), false);
+    assert.equal(await exists(dir, `${P}/Core/Theme`), false);
+    assert.match(await fs.readFile(path.join(dir, THEME_ASSETS.style), 'utf8'), /^  familyId: bold$/m);
+    assert.equal(result.theme.family, 'bold');
+});
+
+test('a theme the template cannot honour fails before the project is touched', async (t) => {
+    const old = await seeded(t);
+    await assert.rejects(generateGame(value({ templateType: 'blank', theme: { family: 'neon' } }),
+        { projectDir: old, template: TEMPLATE, coreVersion: '0.2.0', now: NOW }), /this template has no theme families/);
+    assert.ok(await exists(old, '.template-ref'));
+
+    const dir = await seeded(t, { themes: true });
+    await assert.rejects(generateGame(value({ templateType: 'blank', theme: { family: 'neon', fontPair: 'comic-sans' } }),
+        { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW }), /theme\.fontPair must be one of neon's font pairs: chakrapetch-exo2, outfit-exo2/);
+    await assert.rejects(generateGame(value({ templateType: 'blank', theme: { family: 'sepia' } }),
+        { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW }), /theme\.family must be one of this template's families: bright, neon, pastel, bold, nature, clean/);
+    assert.ok(await exists(dir, '.template-ref'));
+});
+
+test('an older template without themes.json and no theme asked: nothing themed, record theme null', async (t) => {
+    const dir = await seeded(t);
+    const result = await generateGame(value({ templateType: 'blank' }), { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW });
+    assert.equal(result.theme, null);
+    assert.equal((await readRecord(dir)).theme, null);
 });

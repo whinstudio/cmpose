@@ -20,8 +20,9 @@ function idStatuses(flags, ids) {
 const strings = (list) => (Array.isArray(list) ? list.filter((x) => typeof x === 'string') : []);
 
 /** The .cmpose/generation.json content of a generated Unity game (no personal data, no ID values);
- * generatorVersion names the caller (e.g. mcp@0.2.0), null when not given */
-function buildGameRecord({ template, coreVersion, generatorVersion = null, value, now = new Date() }) {
+ * generatorVersion names the caller (e.g. mcp@0.2.0), null when not given; theme the style family as applied
+ * (applyTheme), null for a template without families */
+function buildGameRecord({ template, coreVersion, generatorVersion = null, value, theme = null, now = new Date() }) {
     const flags = strings(value.flags);
     return {
         generator: '@cmpose/core',
@@ -36,6 +37,7 @@ function buildGameRecord({ template, coreVersion, generatorVersion = null, value
         minSdk: value.minSdk,
         iosVersion: value.iosVersion,
         ids: idStatuses(flags, value.ids),
+        theme: theme ? { ...theme } : null,
         template: { repo: template.repo, ref: template.ref, commit: template.commit },
         generatedAt: now.toISOString()
     };

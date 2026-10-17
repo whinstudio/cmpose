@@ -31,11 +31,19 @@ test('buildGameRecord records the options and id statuses, never the id values',
         minSdk: 26,
         iosVersion: '16.0',
         ids: { admob: 'custom', revenueCat: 'test', gameServices: 'off' },
+        theme: null,
         template: TEMPLATE,
         generatedAt: '2026-10-14T08:30:00.000Z'
     });
     assert.ok(!JSON.stringify(record).includes(ADMOB_APP));
     assert.ok(!JSON.stringify(record).includes('Acme'));
+});
+
+test('buildGameRecord records the theme as applied', () => {
+    const theme = { family: 'neon', primary: '#E91E63', fontPair: 'outfit-exo2' };
+    const record = buildGameRecord({ template: TEMPLATE, coreVersion: '0.2.0', value: VALUE, theme, now: NOW });
+    assert.deepEqual(record.theme, theme);
+    assert.notEqual(record.theme, theme);
 });
 
 test('buildGameRecord records who ran the core (e.g. mcp@0.2.0)', () => {

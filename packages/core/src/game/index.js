@@ -10,6 +10,8 @@ const { applyGameReadme } = require('./readme');
 const { buildGameRecord, writeGameRecord } = require('./record');
 const { verifyGameProject } = require('./verifier');
 const { readThemes, validateTheme } = require('./themes');
+const { applyTheme } = require('./applyTheme');
+const { derivePalette } = require('./themeColors');
 
 module.exports = {
     validateGame,
@@ -27,6 +29,8 @@ module.exports = {
     verifyGameProject,
     readThemes,
     validateTheme,
+    applyTheme,
+    derivePalette,
     flags: require('./flags'),
     guid: require('./guid'),
     guidIntegrity: require('./guidIntegrity'),
