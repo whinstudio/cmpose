@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs-extra');
 
@@ -243,7 +244,44 @@ function fullFlags(flags) {
     return out;
 }
 
-async function seedGameTemplate(dir, { full = false, legacyCi = false } = {}) {
+// themes: true copies the real template's .cmpose/themes.json (the six style families); older pins have none.
+// With it come the real template's committed theme assets (family clean), its font and post profile assets (stubs
+// with their real guids) and the scripts the assets name; the dark palette only with full (the uiTheme flag's folder).
+const THEMES_JSON = path.join(__dirname, '..', 'fixtures', 'game', 'themes.json');
+const THEME_FIXTURES = path.join(__dirname, '..', 'fixtures', 'game', 'theme');
+const THEME_ASSETS = {
+    light: 'Assets/_Project/Core/Presentation/Resources/Theme/Light.asset',
+    style: 'Assets/_Project/Core/Presentation/Resources/Theme/Style.asset',
+    dark: 'Assets/_Project/Core/Theme/Resources/Theme/Dark.asset'
+};
+const pathGuid = (rel) => crypto.createHash('md5').update(`seed:${rel}`).digest('hex');
+
+async function seedThemes(dir, { full }) {
+    const write = (rel, content) => fs.outputFile(path.join(dir, rel), content);
+    const folders = new Set();
+    const assetFile = async (rel, guid, content) => {
+        await write(rel, content);
+        await write(`${rel}.meta`, meta(guid));
+        for (let d = path.posix.dirname(rel); d !== 'Assets'; d = path.posix.dirname(d)) folders.add(d);
+    };
+    await fs.copy(THEMES_JSON, path.join(dir, '.cmpose', 'themes.json'));
+    const guids = await fs.readJson(path.join(THEME_FIXTURES, 'guids.json'));
+    for (const [rel, guid] of Object.entries(guids)) {
+        const stub = rel.endsWith('.cs')
+            ? ns('Kturker.UnityBase.Core.Presentation', `    public sealed class ${path.posix.basename(rel, '.cs')} { }\n`)
+            : `%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Name: ${path.posix.basename(rel, '.asset')}\n`;
+        await assetFile(rel, guid, stub);
+    }
+    for (const [name, rel] of Object.entries(THEME_ASSETS)) {
+        if (name === 'dark' && !full) continue;
+        await assetFile(rel, pathGuid(rel), await fs.readFile(path.join(THEME_FIXTURES, path.posix.basename(rel)), 'utf8'));
+    }
+    for (const folder of folders) {
+        if (!(await fs.pathExists(path.join(dir, `${folder}.meta`)))) await write(`${folder}.meta`, meta(pathGuid(folder), true));
+    }
+}
+
+async function seedGameTemplate(dir, { full = false, legacyCi = false, themes = false } = {}) {
     const f = (rel, content) => fs.outputFile(path.join(dir, rel), content);
     const folder = (rel, guid) => f(`${rel}.meta`, meta(guid, true));
     const asset = async (rel, guid, content) => { await f(rel, content); await f(`${rel}.meta`, meta(guid)); };
@@ -331,7 +369,9 @@ async function seedGameTemplate(dir, { full = false, legacyCi = false } = {}) {
         ].join('\n'));
         await f('.cmpose/layers/render-2d/Assets/_Project/Scenes/Menu.unity.meta', meta(GUIDS.menu));
     }
+    // After every other folder: the theme assets' folders get a .meta only where none was written
+    if (themes) await seedThemes(dir, { full });
     return dir;
 }
 
-module.exports = { seedGameTemplate, SEED_GUIDS: GUIDS };
+module.exports = { seedGameTemplate, SEED_GUIDS: GUIDS, THEMES_JSON, THEME_FIXTURES, THEME_ASSETS };

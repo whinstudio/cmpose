@@ -1,6 +1,7 @@
 'use strict';
 const { hashContract } = require('../contract');
 const limits = require('../limits');
+const { THEME_FIELDS } = require('./themes');
 
 // The Unity game generator's contract: what the game_* tools accept. Published facts feed contractVersion.
 const GAME_SCHEMA = Object.freeze({
@@ -26,7 +27,9 @@ const GAME_SCHEMA = Object.freeze({
         'button', 'lifetime', 'object', 'preserve', 'resources', 'serializable', 'transform',
         'about', 'ads', 'boot', 'common', 'guide', 'inspector', 'leaderboards', 'menu', 'network', 'pause',
         'purchases', 'runner2d', 'settings', 'theme', 'track3d', 'update'],
-    reservedPackagePrefix: 'com.kturker'
+    reservedPackagePrefix: 'com.kturker',
+    // The theme request's fields; the families themselves come from the template (game_describe themes)
+    theme: { fields: THEME_FIELDS.slice(), colorFormat: '#RRGGBB' }
 });
 
 function gameContractFacts() {

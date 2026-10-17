@@ -1,0 +1,396 @@
+{
+  "version": 1,
+  "default": "clean",
+  "families": [
+    {
+      "id": "bright",
+      "title": "Bright",
+      "suits": "Casual and hyper-casual puzzles: sorting, colour matching, traffic and bus jams, merge, kids' games",
+      "light": {
+        "Background": "#D7F2FE",
+        "Surface": "#FFFFFF",
+        "Primary": "#884CEF",
+        "OnPrimary": "#FFFFFF",
+        "Text": "#191740",
+        "TextMuted": "#5349CE",
+        "Track": "#D8DFFE",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#D5CBFE",
+        "Control": "#CAD3FD",
+        "Accent": "#EBBF14",
+        "OnAccent": "#191740",
+        "Success": "#12843C",
+        "Danger": "#D81C45"
+      },
+      "dark": {
+        "Background": "#170B2B",
+        "Surface": "#241144",
+        "Primary": "#9F6FF2",
+        "OnPrimary": "#131231",
+        "Text": "#EEEDF1",
+        "TextMuted": "#9F9AE4",
+        "Track": "#2D3145",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#47415C",
+        "Control": "#F6F6F8",
+        "Accent": "#EBBF14",
+        "OnAccent": "#131231",
+        "Success": "#59BD7E",
+        "Danger": "#EB6C88"
+      },
+      "style": {
+        "cornerRadius": 28,
+        "surface": "Raised",
+        "shadowStrength": 0.5,
+        "motion": "Bouncy",
+        "background": "Pattern",
+        "post": "Assets/_Project/Core/Presentation/Theme/Post/bright.asset",
+        "worldColors": [
+          "#FF4D6D",
+          "#FFC233",
+          "#2EC4B6",
+          "#7B61FF"
+        ]
+      },
+      "fontPairs": [
+        {
+          "id": "baloo2-nunito",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Baloo2/Baloo2-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset"
+        },
+        {
+          "id": "rubik-nunito",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Rubik/Rubik-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset"
+        }
+      ]
+    },
+    {
+      "id": "neon",
+      "title": "Neon",
+      "suits": "Arcade action at night: shooters, rhythm, endless runners, space and sci-fi, reflex games",
+      "light": {
+        "Background": "#0E0A26",
+        "Surface": "#1A1442",
+        "Primary": "#FF4FD8",
+        "OnPrimary": "#1A0B2E",
+        "Text": "#F5F2FF",
+        "TextMuted": "#B8AEEB",
+        "Track": "#2B2463",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#43307F",
+        "Control": "#463B8C",
+        "Accent": "#22E4FF",
+        "OnAccent": "#0E0A26",
+        "Success": "#5BEA8C",
+        "Danger": "#FF6B8E"
+      },
+      "dark": {
+        "Background": "#210624",
+        "Surface": "#330A37",
+        "Primary": "#CE57DD",
+        "OnPrimary": "#151523",
+        "Text": "#EEEEEF",
+        "TextMuted": "#AE99CF",
+        "Track": "#332F42",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#623369",
+        "Control": "#F6F6F6",
+        "Accent": "#32D6EF",
+        "OnAccent": "#151523",
+        "Success": "#89B845",
+        "Danger": "#EB6C88"
+      },
+      "style": {
+        "cornerRadius": 12,
+        "surface": "Soft",
+        "shadowStrength": 0.3,
+        "motion": "Snappy",
+        "background": "Gradient",
+        "post": "Assets/_Project/Core/Presentation/Theme/Post/neon.asset",
+        "worldColors": [
+          "#FF2BD6",
+          "#22E4FF",
+          "#B6FF3B",
+          "#FFB020"
+        ]
+      },
+      "fontPairs": [
+        {
+          "id": "chakrapetch-exo2",
+          "display": "Assets/_Project/Core/Presentation/Fonts/ChakraPetch/ChakraPetch-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Exo2/Exo2-Regular SDF.asset"
+        },
+        {
+          "id": "outfit-exo2",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Outfit/Outfit-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Exo2/Exo2-Regular SDF.asset"
+        }
+      ]
+    },
+    {
+      "id": "pastel",
+      "title": "Pastel",
+      "suits": "Cozy and relaxing: merge, idle, decorating, cooking, cute pets, calm puzzles",
+      "light": {
+        "Background": "#FDE8F4",
+        "Surface": "#FFFDFB",
+        "Primary": "#D32673",
+        "OnPrimary": "#FFFFFF",
+        "Text": "#2A1625",
+        "TextMuted": "#73546B",
+        "Track": "#FBD5EB",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#D3CDF3",
+        "Control": "#F3C8E1",
+        "Accent": "#67D8AC",
+        "OnAccent": "#2A1625",
+        "Success": "#0C8264",
+        "Danger": "#D81C45"
+      },
+      "dark": {
+        "Background": "#250714",
+        "Surface": "#390A1F",
+        "Primary": "#E35694",
+        "OnPrimary": "#20111D",
+        "Text": "#EFEDEE",
+        "TextMuted": "#AE9DAA",
+        "Track": "#3A2F35",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#464350",
+        "Control": "#F7F6F6",
+        "Accent": "#67D8AC",
+        "OnAccent": "#20111D",
+        "Success": "#55BBA1",
+        "Danger": "#EB6C88"
+      },
+      "style": {
+        "cornerRadius": 32,
+        "surface": "Soft",
+        "shadowStrength": 0.2,
+        "motion": "Calm",
+        "background": "Gradient",
+        "post": "Assets/_Project/Core/Presentation/Theme/Post/pastel.asset",
+        "worldColors": [
+          "#FF9EBB",
+          "#9ED8FF",
+          "#B5F0C8",
+          "#FFD59E"
+        ]
+      },
+      "fontPairs": [
+        {
+          "id": "nunito-nunito",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset"
+        },
+        {
+          "id": "baloo2-nunito",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Baloo2/Baloo2-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset"
+        }
+      ]
+    },
+    {
+      "id": "bold",
+      "title": "Bold",
+      "suits": "Competitive action: archery and hero shooters, sports, racing, fighting, io games",
+      "light": {
+        "Background": "#FFC93C",
+        "Surface": "#FFFFFF",
+        "Primary": "#A8360A",
+        "OnPrimary": "#FFFFFF",
+        "Text": "#1E1D1C",
+        "TextMuted": "#5E5650",
+        "Track": "#E8E1D8",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#F2A56B",
+        "Control": "#D6D4D2",
+        "Accent": "#2346D8",
+        "OnAccent": "#FFFFFF",
+        "Success": "#12843C",
+        "Danger": "#D72525"
+      },
+      "dark": {
+        "Background": "#210C02",
+        "Surface": "#331303",
+        "Primary": "#EA5B10",
+        "OnPrimary": "#171615",
+        "Text": "#EEEEED",
+        "TextMuted": "#A3A2A0",
+        "Track": "#323231",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#584028",
+        "Control": "#F6F6F5",
+        "Accent": "#EBBF14",
+        "OnAccent": "#171615",
+        "Success": "#59BD7E",
+        "Danger": "#E87171"
+      },
+      "style": {
+        "cornerRadius": 14,
+        "surface": "Raised",
+        "shadowStrength": 0.6,
+        "motion": "Snappy",
+        "background": "Solid",
+        "post": "Assets/_Project/Core/Presentation/Theme/Post/bold.asset",
+        "worldColors": [
+          "#FF3B30",
+          "#FFCC00",
+          "#0A84FF",
+          "#34C759"
+        ]
+      },
+      "fontPairs": [
+        {
+          "id": "montserrat-inter",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Montserrat/Montserrat-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Inter/Inter-Regular SDF.asset"
+        },
+        {
+          "id": "rubik-inter",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Rubik/Rubik-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Inter/Inter-Regular SDF.asset"
+        }
+      ]
+    },
+    {
+      "id": "nature",
+      "title": "Nature",
+      "suits": "Outdoors and growth: farming, gardening, adventure, word games, fishing, idle simulations",
+      "light": {
+        "Background": "#F3E6C4",
+        "Surface": "#FFFEF7",
+        "Primary": "#157338",
+        "OnPrimary": "#FFFFFF",
+        "Text": "#121F15",
+        "TextMuted": "#4A6450",
+        "Track": "#D9E3C8",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#9FD45A",
+        "Control": "#CED8BE",
+        "Accent": "#F28C28",
+        "OnAccent": "#121F15",
+        "Success": "#0B8076",
+        "Danger": "#C54141"
+      },
+      "dark": {
+        "Background": "#04150A",
+        "Surface": "#052110",
+        "Primary": "#449A64",
+        "OnPrimary": "#0E1811",
+        "Text": "#ECEEEC",
+        "TextMuted": "#97A69A",
+        "Track": "#30332D",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#3A4A1F",
+        "Control": "#F6F6F6",
+        "Accent": "#F8B94E",
+        "OnAccent": "#0E1811",
+        "Success": "#60B9B1",
+        "Danger": "#D67C7C"
+      },
+      "style": {
+        "cornerRadius": 22,
+        "surface": "Raised",
+        "shadowStrength": 0.4,
+        "motion": "Calm",
+        "background": "Pattern",
+        "post": "Assets/_Project/Core/Presentation/Theme/Post/nature.asset",
+        "worldColors": [
+          "#6BBF59",
+          "#F2A541",
+          "#4FA3D9",
+          "#C8553D"
+        ]
+      },
+      "fontPairs": [
+        {
+          "id": "rubik-nunito",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Rubik/Rubik-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset"
+        },
+        {
+          "id": "nunito-nunito",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Nunito/Nunito-Regular SDF.asset"
+        }
+      ]
+    },
+    {
+      "id": "clean",
+      "title": "Clean",
+      "suits": "Any game; the default: minimal puzzles, brain teasers, board and card games, tools-like games",
+      "light": {
+        "Background": "#EAEEF3",
+        "Surface": "#FFFFFF",
+        "Primary": "#2D68EC",
+        "OnPrimary": "#FFFFFF",
+        "Text": "#151D2F",
+        "TextMuted": "#515F71",
+        "Track": "#D9E1E9",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#B9D4F5",
+        "Control": "#CCD6E1",
+        "Accent": "#F8B94E",
+        "OnAccent": "#151D2F",
+        "Success": "#12843C",
+        "Danger": "#D72525"
+      },
+      "dark": {
+        "Background": "#061129",
+        "Surface": "#0A1A3F",
+        "Primary": "#5586EF",
+        "OnPrimary": "#0E1527",
+        "Text": "#EDEEEF",
+        "TextMuted": "#9BA3AD",
+        "Track": "#303235",
+        "Scrim": "#00000099",
+        "Picture": "#FFFFFF",
+        "SurfaceVariant": "#3D4652",
+        "Control": "#F5F6F7",
+        "Accent": "#F8B94E",
+        "OnAccent": "#0E1527",
+        "Success": "#59BD7E",
+        "Danger": "#E87171"
+      },
+      "style": {
+        "cornerRadius": 20,
+        "surface": "Soft",
+        "shadowStrength": 0.35,
+        "motion": "Snappy",
+        "background": "Gradient",
+        "post": "Assets/_Project/Core/Presentation/Theme/Post/clean.asset",
+        "worldColors": [
+          "#3B82F6",
+          "#F59E0B",
+          "#10B981",
+          "#EF4444"
+        ]
+      },
+      "fontPairs": [
+        {
+          "id": "outfit-inter",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Outfit/Outfit-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Inter/Inter-Regular SDF.asset"
+        },
+        {
+          "id": "montserrat-inter",
+          "display": "Assets/_Project/Core/Presentation/Fonts/Montserrat/Montserrat-Bold SDF.asset",
+          "body": "Assets/_Project/Core/Presentation/Fonts/Inter/Inter-Regular SDF.asset"
+        }
+      ]
+    }
+  ]
+}

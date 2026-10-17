@@ -12,6 +12,8 @@ const { writeGameIds } = require('./ids');
 const { applyGameReadme } = require('./readme');
 const { buildGameRecord, writeGameRecord } = require('./record');
 const { verifyGameProject } = require('./verifier');
+const { readThemes, validateTheme } = require('./themes');
+const { applyTheme } = require('./applyTheme');
 
 // The template cache's own records and Unity's local state never reach the project; nor does the template's
 // LICENSE (the generated project is the user's, to license as they choose), nor an older template's GameCI
@@ -42,6 +44,11 @@ async function generateGame(value, { projectDir, template = null, coreVersion, g
         commit: await readMarker(COMMIT_FILE_NAME)
     };
 
+    // The family and font pair are checked against the template's themes.json before anything changes
+    const themes = await readThemes(projectDir);
+    const theme = validateTheme(value.theme, themes);
+    if (!theme.ok) throw new Error(theme.error);
+
     // 1. leftovers
     for (const leftover of LEFTOVERS) await fs.remove(path.join(projectDir, leftover));
     log.info('✅ Cleanup completed');
@@ -63,13 +70,20 @@ async function generateGame(value, { projectDir, template = null, coreVersion, g
     await applyGameReadme(projectDir, value);
     log.info(`✅ Renamed to ${value.companyName}.${value.projectName} (${value.packageName})`);
 
-    // 7. a broken project is never returned
+    // 7. the style family (the template's default when none was asked; nothing for a template without families)
+    let applied = { warnings: [], theme: null };
+    if (theme.value) {
+        applied = await applyTheme(projectDir, theme.value, themes, { uiTheme: value.flags.includes('uiTheme') });
+        log.info(`✅ Applied theme ${applied.theme.family} (${applied.theme.fontPair})`);
+    }
+
+    // 8. a broken project is never returned
     const problems = await verifyGameProject(projectDir);
     if (problems.length) throw new Error('generated project failed verification:\n- ' + problems.join('\n- '));
 
-    // 8. the template's package guid allowlist goes; the record stays
+    // 9. the template's package guid allowlist goes; the record stays
     await fs.remove(path.join(projectDir, PACKAGE_GUIDS));
-    const record = buildGameRecord({ template: source, coreVersion, generatorVersion, value, now });
+    const record = buildGameRecord({ template: source, coreVersion, generatorVersion, value, theme: applied.theme, now });
     await writeGameRecord(projectDir, record);
 
     return {
@@ -78,7 +92,8 @@ async function generateGame(value, { projectDir, template = null, coreVersion, g
         flags: value.flags.slice(),
         features: value.features.slice(),
         ids: record.ids,
-        warnings: gameWarnings(value)
+        theme: applied.theme,
+        warnings: [...applied.warnings, ...gameWarnings(value)]
     };
 }
 

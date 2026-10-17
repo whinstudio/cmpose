@@ -59,12 +59,14 @@ async function runGameGenerate(args, { cacheDir, remoteUrl, onProgress = () => {
             render: summary.render,
             flags: summary.flags,
             features: summary.features,
+            theme: summary.theme,
             warnings: summary.warnings,
             nextSteps: NEXT_STEPS_GAME
         };
         const text = [
             `Generated ${value.projectName} at ${target}`,
             `Template: ${source.repo}@${source.ref} (${String(source.commit).slice(0, 7)})`,
+            ...(result.theme ? [`Theme: ${result.theme.family} (${result.theme.fontPair})`] : []),
             ...result.warnings.map((w) => `Warning: ${w}`),
             'Next steps:', ...NEXT_STEPS_GAME.map((s) => `- ${s}`)
         ].join('\n');
@@ -75,4 +77,21 @@ async function runGameGenerate(args, { cacheDir, remoteUrl, onProgress = () => {
     }
 }
 
-module.exports = { runGameGenerate, NEXT_STEPS_GAME };
+// game_describe with the pinned template's theme families (fetched into the cache on first use).
+// A template that cannot be fetched or read still describes the generator: no families, and why.
+async function runGameDescribe({ cacheDir, remoteUrl } = {}) {
+    let themes = null;
+    let unavailable = null;
+    try {
+        const cache = await core.templateCache.ensure({ ...core.pins.game, cacheDir, remoteUrl });
+        themes = await core.game.readThemes(cache.dir);
+    } catch (err) {
+        if (!(err instanceof core.TemplateFetchError || err instanceof TypeError || err instanceof core.game.ThemesFileError)) throw err;
+        unavailable = `Theme families unavailable: ${err.message}`;
+    }
+    const facts = core.game.describeGame({ themes });
+    if (unavailable) facts.themes.unavailable = unavailable;
+    return { content: [{ type: 'text', text: JSON.stringify(facts, null, 2) }], structuredContent: facts };
+}
+
+module.exports = { runGameGenerate, runGameDescribe, NEXT_STEPS_GAME };

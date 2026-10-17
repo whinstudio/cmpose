@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83edc961561242848ac4b6707b78488e, type: 3}
+  m_Name: Style
+  m_EditorClassIdentifier: Kturker.UnityBase.Core.Presentation::Kturker.UnityBase.Core.Presentation.ThemeStyle
+  familyId: clean
+  displayFont: {fileID: 11400000, guid: cdc57af4120f84337bed141d1fd1d329, type: 2}
+  bodyFont: {fileID: 11400000, guid: 73086bebd8b5e43d6b4d8f0cbf7fc2bc, type: 2}
+  cornerRadius: 20
+  surface: 1
+  shadowStrength: 0.35
+  motion: 1
+  post: {fileID: 11400000, guid: d55fcc2f7b27441ca9a88abda89bf6e2, type: 2}
+  background: 1
+  worldColors:
+  - {r: 0.23137255, g: 0.50980395, b: 0.9647059, a: 1}
+  - {r: 0.9607843, g: 0.61960787, b: 0.043137256, a: 1}
+  - {r: 0.0627451, g: 0.7254902, b: 0.5058824, a: 1}
+  - {r: 0.9372549, g: 0.26666668, b: 0.26666668, a: 1}
