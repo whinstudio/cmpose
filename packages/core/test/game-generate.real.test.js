@@ -97,3 +97,14 @@ test('the real template with uiTheme off: no Dark.asset, a themed light palette'
     assert.equal(await fs.pathExists(path.join(dir, THEME_FILES[1])), false);
     assert.deepEqual(await verifyGameProject(dir), []);
 });
+
+test('the real template describes its six families for a planner', REAL ? {} : { skip: 'CMP_GAME_TEMPLATE_DIR not set' }, async () => {
+    const { describeGame } = require('../src/game/describe');
+    const { themes } = describeGame({ themes: await readThemes(REAL) });
+    assert.equal(themes.default, 'clean');
+    assert.deepEqual(themes.families.map((f) => f.id), ['bright', 'neon', 'pastel', 'bold', 'nature', 'clean']);
+    for (const f of themes.families) {
+        assert.ok(f.title && f.suits, f.id);
+        assert.ok(f.fontPairs.length > 0 && f.fontPairs.every((p) => typeof p === 'string'), f.id);
+    }
+});

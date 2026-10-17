@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const os = require('os');
 const path = require('path');
 const fs = require('fs-extra');
-const { readThemes, validateTheme, checkThemeShape, THEMES_PATH } = require('../src/game/themes');
+const { readThemes, validateTheme, checkThemeShape, THEMES_PATH, ThemesFileError } = require('../src/game/themes');
 const { seedGameTemplate } = require('./support/seedGameTemplate');
 
 const IDS = ['bright', 'neon', 'pastel', 'bold', 'nature', 'clean'];
@@ -37,7 +37,7 @@ test('a broken themes.json fails closed', async () => {
     const dir = await seedGameTemplate(tmp());
     const file = path.join(dir, THEMES_PATH);
     await fs.outputFile(file, '{ not json');
-    await assert.rejects(readThemes(dir), /themes\.json/);
+    await assert.rejects(readThemes(dir), (err) => err instanceof ThemesFileError && /themes\.json/.test(err.message));
     for (const bad of [
         { version: 1, default: 'clean', families: 'x' },
         { version: 1, default: 'missing', families: [] },

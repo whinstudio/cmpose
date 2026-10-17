@@ -9,7 +9,7 @@ const { writeGameIds } = require('./ids');
 const { applyGameReadme } = require('./readme');
 const { buildGameRecord, writeGameRecord } = require('./record');
 const { verifyGameProject } = require('./verifier');
-const { readThemes, validateTheme } = require('./themes');
+const { readThemes, validateTheme, ThemesFileError } = require('./themes');
 const { applyTheme } = require('./applyTheme');
 const { derivePalette } = require('./themeColors');
 
@@ -28,6 +28,7 @@ module.exports = {
     writeGameRecord,
     verifyGameProject,
     readThemes,
+    ThemesFileError,
     validateTheme,
     applyTheme,
     derivePalette,

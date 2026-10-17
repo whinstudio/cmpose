@@ -76,6 +76,13 @@ saving, deep links, and in-app review and update check.
 - **IDs:** `ids` takes your real AdMob (`admob`), RevenueCat (`revenueCat`) and Play Games +
   Game Center (`gameServices`) IDs, each group with its flag; `game_describe` lists the fields.
   A group you leave out keeps the test IDs / placeholders and is reported as a warning.
+- **Look (`theme`):** one of the template's style families (`bright`, `neon`, `pastel`, `bold`,
+  `nature`, `clean`; palette, shapes, motion and a font pair), listed by `game_describe` under
+  `themes` with what each suits. `theme: { family, primary, accent, fontPair }`, every field
+  optional: `primary` and `accent` (`#RRGGBB`) recolour the family with their lightness shifted
+  until text and buttons keep their contrast; a colour that still cannot pass keeps the
+  family's and is reported as a warning. Without `theme` the project gets `clean`, exactly as
+  the template ships it.
 - **Your names everywhere:** package (application identifier), company name, app name, min SDK
   (25 to 36) and iOS deployment target (15.0 to 26.2).
 
@@ -98,14 +105,18 @@ as one Docker container behind nginx. `sharing` adds spaces, roles and invitatio
   It returns the project path, the template version it used, warnings (e.g. test ad IDs to
   replace) and next steps.
 - `game_describe`: the Unity game generator's engine and editor version, template types,
-  renders, flags and their dependencies, ID groups, defaults and limits. Agents call it first.
+  renders, flags and their dependencies, ID groups, defaults, limits and the pinned template's
+  theme families (`themes`: `default` and each family's `id`, `title`, `suits` and `fontPairs`;
+  the first call downloads the template). Agents call it first.
 - `game_generate`: creates the game. Required: `projectName` (1 to 30 letters or digits,
   starting with a letter), `appName` (up to 30 characters), `packageName` (e.g.
   `com.acme.skyhopper`, at least 3 segments, up to 50 characters) and an absolute `outputDir`.
   Optional: `companyName` (like `projectName`; by default the package's second segment,
   capitalized), `templateType`, `render`, `flags`, `features` (module names: 1 to 20 lowercase
   letters or digits, starting with a letter), `minSdk` (25 to 36), `iosVersion` (15.0 to 26.2,
-  written as `major.minor`), `ids`, `templateRef`. It never overwrites a non-empty folder.
+  written as `major.minor`), `ids`, `theme`, `templateRef`. It never overwrites a non-empty
+  folder. The result names the applied theme (`theme`) and lists colour fallbacks among the
+  warnings.
 - `backend_describe`: the backend generator's options, `appName` rules, the project anatomy and
   the conventions to follow when adding code (protected routes, the 404 rule, where features
   go, the security checklist, the local runner and the deploy parts). Agents call it first.

@@ -7,7 +7,7 @@ const core = require('@cmpose/core');
 const pkg = require('../package.json');
 const { describe } = require('./describe');
 const { runGenerate } = require('./generate');
-const { runGameGenerate } = require('./gameGenerate');
+const { runGameGenerate, runGameDescribe } = require('./gameGenerate');
 const { runBackendGenerate } = require('./backendGenerate');
 
 const GENERATE_DESCRIPTION = 'Generate a Compose Multiplatform (Android + iOS) project on this machine. ' +
@@ -17,6 +17,11 @@ const GENERATE_DESCRIPTION = 'Generate a Compose Multiplatform (Android + iOS) p
 const GAME_GENERATE_DESCRIPTION = 'Generate a Unity 6 (Android + iOS) mobile game project on this machine. ' +
     'Call game_describe first for the flags, defaults and validation rules. ' +
     'showcase has every flag on; flags and features apply to blank only. ' +
+    'theme picks one of the style families game_describe lists under themes (palette, shapes, motion, fonts; ' +
+    'match the family whose suits fits the game) and optionally a fontPair of that family. primary and accent ' +
+    '(#RRGGBB) recolour the family: their lightness is shifted until text and buttons keep their contrast, and a ' +
+    'colour that still cannot pass falls back to the family default with a warning. Without theme the template ' +
+    'default family (clean) is used. ' +
     'Writes <outputDir>/<projectName>; never overwrites an existing non-empty folder.';
 
 const BACKEND_GENERATE_DESCRIPTION = 'Generate a standalone Kotlin/Ktor backend (Docker-ready) on this machine. ' +
@@ -70,12 +75,9 @@ function createServer({ cacheDir, remoteUrl, backendTemplateDir = process.env.CM
     }));
 
     server.registerTool('game_describe', {
-        description: 'Describe the Unity game generator: engine and editor version, template types, renders, flags and their dependencies, ID groups, defaults, validation limits and the pinned game template.',
+        description: 'Describe the Unity game generator: engine and editor version, template types, renders, flags and their dependencies, ID groups, defaults, validation limits, the pinned game template and its theme families (themes: default, and each family\'s id, title, suits and fontPairs).',
         inputSchema: {}
-    }, async () => {
-        const facts = core.game.describeGame();
-        return { content: [{ type: 'text', text: JSON.stringify(facts, null, 2) }], structuredContent: facts };
-    });
+    }, async () => runGameDescribe({ cacheDir, remoteUrl }));
 
     server.registerTool('game_generate', {
         description: GAME_GENERATE_DESCRIPTION,
@@ -96,6 +98,14 @@ function createServer({ cacheDir, remoteUrl, backendTemplateDir = process.env.CM
             ids: z.record(z.string(), z.record(z.string(), z.string())).optional()
                 .describe('Real IDs by group (admob, revenueCat, gameServices; fields in game_describe), each needing its flag. ' +
                     'A group left out keeps the test IDs / placeholders, reported as a warning'),
+            // passthrough: unknown fields reach validateGame, which refuses them by name
+            theme: z.object({
+                family: z.string().optional().describe('A family id from game_describe themes.families (default: themes.default)'),
+                primary: z.string().optional().describe('#RRGGBB primary colour; lightness is adjusted to keep contrast'),
+                accent: z.string().optional().describe('#RRGGBB accent colour; lightness is adjusted to keep contrast'),
+                fontPair: z.string().optional().describe("One of the family's fontPairs (default: its first)")
+            }).passthrough().optional()
+                .describe('Style family and optional colour shifts; without it the template default family is used'),
             templateRef: z.string().optional().describe('Override the pinned game template tag')
         }
     }, async (args, extra) => runGameGenerate(args, {

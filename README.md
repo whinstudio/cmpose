@@ -64,7 +64,8 @@ Add the server to the client's `mcpServers` configuration:
 (blank only), `minSdk`, `iosVersion`, `ci` and `templateRef`; `cmp_describe` lists the defaults
 and rules. `game_generate` takes the same required fields plus optional `companyName`,
 `templateType`, `render` (`2d` | `3d`), `flags` and `features` (blank only), `minSdk`,
-`iosVersion`, `ids` and `templateRef`; `game_describe` lists the flags, ID groups and limits.
+`iosVersion`, `ids`, `theme` and `templateRef`; `game_describe` lists the flags, ID groups,
+limits and the template's theme families.
 `backend_generate` takes the same required fields (`appName` is the service name, e.g.
 `notes-api`) plus optional `sharing` and `templateRef`; `backend_describe` lists the rules and
 the conventions an agent follows when it adds code to the generated backend.

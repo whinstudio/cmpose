@@ -12,8 +12,11 @@ const PALETTE_HEX_RE = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isText = (v) => typeof v === 'string' && v.length > 0;
 
+// A template's themes.json that is there but cannot be used
+class ThemesFileError extends Error { }
+
 function broken(why) {
-    return new Error(`${THEMES_PATH.split(path.sep).join('/')} is not valid: ${why}`);
+    return new ThemesFileError(`${THEMES_PATH.split(path.sep).join('/')} is not valid: ${why}`);
 }
 
 function checkPalette(id, name, palette) {
@@ -106,4 +109,4 @@ function validateTheme(theme, themes) {
     };
 }
 
-module.exports = { THEMES_PATH, readThemes, validateTheme, checkThemeShape };
+module.exports = { THEMES_PATH, THEME_FIELDS, ThemesFileError, readThemes, validateTheme, checkThemeShape };

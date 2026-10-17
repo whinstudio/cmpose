@@ -7,6 +7,7 @@ const { tmpDir } = require('./support/gameFixtures');
 const { validateGame } = require('../src/game/validate');
 const { generateGame } = require('../src/game/generate');
 const { describeGame } = require('../src/game/describe');
+const { readThemes } = require('../src/game/themes');
 const { GAME_SCHEMA, gameContractFacts, gameContractVersion } = require('../src/game/contract');
 const game = require('../src/game');
 const pins = require('../src/pins');
@@ -174,9 +175,31 @@ test('describeGame states the engine, the pin, the defaults and the contract', (
             templateType: 'showcase', render: '2d', flags: { showcase: GAME_SCHEMA.flags.slice(), blank: [] },
             features: [], minSdk: 25, iosVersion: '15.0'
         },
+        themes: { default: null, families: [] },
         contract: gameContractFacts()
     });
     assert.equal(describeGame().defaults.flags.showcase.length, 8);
+});
+
+test('describeGame lists the template families for a planner: id, title, suits and font pair ids only', async (t) => {
+    const themes = await readThemes(await seeded(t, { themes: true }));
+    const facts = describeGame({ themes });
+    assert.equal(facts.themes.default, 'clean');
+    assert.deepEqual(facts.themes.families.map((f) => f.id), ['bright', 'neon', 'pastel', 'bold', 'nature', 'clean']);
+    const clean = facts.themes.families.find((f) => f.id === 'clean');
+    assert.deepEqual(clean, {
+        id: 'clean', title: 'Clean', suits: themes.families.find((f) => f.id === 'clean').suits,
+        fontPairs: ['outfit-inter', 'montserrat-inter']
+    });
+    assert.match(clean.suits, /default/);
+    // The families stay outside the hashed contract: the same contractVersion with or without a template
+    assert.equal(facts.contractVersion, describeGame().contractVersion);
+    assert.equal(facts.contract.themes, undefined);
+});
+
+test('describeGame of a template without themes.json has no families', async (t) => {
+    const themes = await readThemes(await seeded(t));
+    assert.deepEqual(describeGame({ themes }).themes, { default: null, families: [] });
 });
 
 test('pins.game names the game template repo', () => {
