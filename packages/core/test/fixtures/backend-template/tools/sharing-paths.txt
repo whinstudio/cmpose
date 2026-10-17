@@ -1,0 +1,3 @@
+src/main/kotlin/io/cmpose/backendtemplate/sharing
+src/main/resources/db/migration/V2__sharing.sql
+src/test/kotlin/io/cmpose/backendtemplate/SpaceRoutesTest.kt

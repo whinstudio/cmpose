@@ -3,16 +3,10 @@ const fs = require('fs-extra');
 const path = require('path');
 const { removeSwiftPackage, parseObjects, isa } = require('./xcodePackages');
 const { PRIVACY_MANIFEST } = require('./privacyManifest');
+const { removeMarkedBlocks, applySwapMarkers } = require('./markerBlocks');
 
 // featuresConfig.backend: the template marks everything the backend adds (MAINTAINING.md → Backend markers).
 // Off strips it, on keeps it and drops only the markers. Runs on the template package, before the rename.
-
-const MARKERS = {
-    slash: { open: '// cmpose:backend', close: '// /cmpose:backend' },
-    hash: { open: '# cmpose:backend', close: '# /cmpose:backend' },
-    html: { open: '<!-- cmpose:backend -->', close: '<!-- /cmpose:backend -->' }
-};
-const SWAP = '// cmpose:backend-off: ';
 
 const KIND_BY_EXTENSION = {
     '.kt': 'slash', '.kts': 'slash', '.swift': 'slash', '.xcconfig': 'slash',
@@ -74,63 +68,6 @@ const BACKEND_PIN_IDENTITIES = new Set([
     'googleappmeasurement', 'googledatatransport', 'googlesignin-ios', 'googleutilities', 'grpc-binary',
     'gtm-session-fetcher', 'gtmappauth', 'interop-ios-for-google-sdks', 'leveldb', 'nanopb', 'promises', 'swift-protobuf'
 ]);
-
-// Off: drops each marked block with its marker lines; on: drops only the marker lines. Either way a blank
-// line on both sides of a dropped run becomes one (blank runs elsewhere stay).
-function removeMarkedBlocks(content, kind, keep) {
-    const { open, close } = MARKERS[kind];
-    const out = [];
-    const joins = [];
-    let inside = false;
-    let dropped = false;
-    for (const line of content.split('\n')) {
-        const t = line.trim();
-        if (t === open) {
-            if (inside) throw new Error(`nested ${open}`);
-            inside = true;
-            dropped = true;
-            continue;
-        }
-        if (t === close) {
-            if (!inside) throw new Error(`stray ${close}`);
-            inside = false;
-            dropped = true;
-            continue;
-        }
-        if (inside && !keep) continue;
-        if (dropped) joins.push(out.length);
-        dropped = false;
-        out.push(line);
-    }
-    if (inside) throw new Error('unclosed cmpose:backend block');
-    if (dropped) joins.push(out.length);
-    return collapseBlankRuns(out, joins).join('\n');
-}
-
-// At each join (the index of the first line after a dropped run), blank lines that follow a blank line go
-function collapseBlankRuns(lines, joins) {
-    const drop = new Set();
-    for (const join of joins) {
-        if (join === 0 || lines[join - 1] !== '') continue;
-        for (let i = join; i < lines.length && lines[i] === ''; i++) drop.add(i);
-    }
-    return lines.filter((_, i) => !drop.has(i));
-}
-
-// Off: the line after a swap marker becomes the marker's text at that line's indentation; on: the marker goes
-function applySwapMarkers(content, keep) {
-    const lines = content.split('\n');
-    const out = [];
-    for (let i = 0; i < lines.length; i++) {
-        const t = lines[i].trim();
-        if (!t.startsWith(SWAP)) { out.push(lines[i]); continue; }
-        const next = lines[i + 1];
-        if (next === undefined) throw new Error('cmpose:backend-off marker on the last line');
-        if (keep) { out.push(next); } else { out.push(next.match(/^\s*/)[0] + t.slice(SWAP.length)); }
-        i++;
-    }
-    return out.join('\n');
-}
 
 // Off: the Firebase and GoogleSignIn packages, the build phase copying GoogleService-Info.plist, the
 // membership exceptions of the entitlements and GoogleService-Info.plist, and the entitlements and

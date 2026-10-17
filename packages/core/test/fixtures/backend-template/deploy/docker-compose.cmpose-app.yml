@@ -1,0 +1,11 @@
+# The cmpose-app service; settings come from apps/cmpose-app.env.
+services:
+  cmpose-app:
+    image: ghcr.io/${IMAGE_OWNER}/cmpose-app:${IMAGE_TAG:-latest}
+    env_file: ./apps/cmpose-app.env
+    mem_limit: ${CMPOSE_APP_MEM_LIMIT:-512m}
+    environment:
+      # cmpose:sharing
+      INVITE_TTL_DAYS: "7"
+      # /cmpose:sharing
+      PORT: "8080"

@@ -1,0 +1,1 @@
+CREATE TABLE spaces (id UUID PRIMARY KEY);

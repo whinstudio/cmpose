@@ -1,0 +1,6 @@
+.gradle/
+build/
+# cmpose:sharing
+/invites/
+# /cmpose:sharing
+.local-server/

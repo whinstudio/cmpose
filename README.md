@@ -14,9 +14,15 @@ leaderboards"): a Unity 6 (URP) Android + iOS project from the pinned game templ
 `blank` game with flags for saving, theming, multi-language, networking, RevenueCat purchases,
 AdMob ads and Play Games / Game Center leaderboards, up to 3 feature modules and your real IDs.
 
+And it generates a standalone Kotlin/Ktor backend ("a backend called NotesBackend with
+sharing"): Firebase sign-in verified on the server, PostgreSQL with Flyway, file uploads, a
+sample feature to copy and the parts to deploy it as one Docker container, from the pinned
+backend template (`whinstudio/cmpose-backend-template`), with an optional `sharing` part
+(spaces, roles and invitations).
+
 - `@cmpose/core` — the generator library.
-- `@cmpose/mcp` — a local stdio MCP server with four tools: `cmp_describe`, `cmp_generate`,
-  `game_describe` and `game_generate`.
+- `@cmpose/mcp` — a local stdio MCP server with six tools: `cmp_describe`, `cmp_generate`,
+  `game_describe`, `game_generate`, `backend_describe` and `backend_generate`.
 
 Requires Node.js 20+ and git. The first generation downloads the pinned template
 (`whinstudio/cmpose-template`) into `~/.cache/cmpose` (override: `CMPOSE_CACHE_DIR`).
@@ -59,6 +65,9 @@ Add the server to the client's `mcpServers` configuration:
 and rules. `game_generate` takes the same required fields plus optional `companyName`,
 `templateType`, `render` (`2d` | `3d`), `flags` and `features` (blank only), `minSdk`,
 `iosVersion`, `ids` and `templateRef`; `game_describe` lists the flags, ID groups and limits.
+`backend_generate` takes the same required fields (`appName` is the service name, e.g.
+`notes-api`) plus optional `sharing` and `templateRef`; `backend_describe` lists the rules and
+the conventions an agent follows when it adds code to the generated backend.
 
 ## Develop
 

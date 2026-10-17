@@ -27,6 +27,7 @@ module.exports = {
     fileService: require('./fileService'),
     featureModules: require('./featureModules'),
     backendOption: require('./backendOption'),
+    markerBlocks: require('./markerBlocks'),
     TemplateCapabilityError: require('./featureModules').TemplateCapabilityError,
     verifyGeneratedProject: require('./generationVerifier').verifyGeneratedProject,
     validate: require('./validate').validate,
@@ -35,5 +36,6 @@ module.exports = {
     generateCmpProject: require('./generate').generateCmpProject,
     templateCache: require('./templateCache'),
     game: require('./game'),
+    backend: require('./backend'),
     TemplateFetchError: require('./templateCache').TemplateFetchError
 };

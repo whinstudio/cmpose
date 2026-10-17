@@ -2,9 +2,10 @@
 
 Ask your AI agent for a **Compose Multiplatform** app and get a real, buildable Android + iOS
 project on disk, generated locally from a tested template. It also generates **Unity** mobile
-games (Android + iOS). This is a local stdio MCP server with four tools: `cmp_describe`,
-`cmp_generate`, `game_describe` and `game_generate`. It runs on your machine, with no account,
-no API key and no upload.
+games (Android + iOS) and standalone **Kotlin/Ktor backends**. This is a local stdio MCP
+server with six tools: `cmp_describe`, `cmp_generate`, `game_describe`, `game_generate`,
+`backend_describe` and `backend_generate`. It runs on your machine, with no account, no API key
+and no upload.
 
 > "Create a blank Compose Multiplatform app called Habits, package com.acme.habits, in
 > ~/Projects, with Room, light/dark theming and AdMob ads."
@@ -78,6 +79,14 @@ saving, deep links, and in-app review and update check.
 - **Your names everywhere:** package (application identifier), company name, app name, min SDK
   (25 to 36) and iOS deployment target (15.0 to 26.2).
 
+> "Create a backend called NotesBackend, service name notes-api, package com.acme.notes, in
+> ~/Projects, with sharing"
+
+Every backend is a Kotlin (JVM 21) Ktor server with PostgreSQL (Exposed, Flyway), Firebase ID
+tokens verified on the server (no Admin SDK), file uploads, account deletion, one sample feature
+to copy, a security checklist, a local runner (`./gradlew runLocal`) and the parts to deploy it
+as one Docker container behind nginx. `sharing` adds spaces, roles and invitations.
+
 ## Tools
 
 - `cmp_describe`: the defaults, the options and the rules (name formats, limits, which option
@@ -97,6 +106,15 @@ saving, deep links, and in-app review and update check.
   capitalized), `templateType`, `render`, `flags`, `features` (module names: 1 to 20 lowercase
   letters or digits, starting with a letter), `minSdk` (25 to 36), `iosVersion` (15.0 to 26.2,
   written as `major.minor`), `ids`, `templateRef`. It never overwrites a non-empty folder.
+- `backend_describe`: the backend generator's options, `appName` rules, the project anatomy and
+  the conventions to follow when adding code (protected routes, the 404 rule, where features
+  go, the security checklist, the local runner and the deploy parts). Agents call it first.
+- `backend_generate`: creates the backend. Required: `projectName` (letters only, up to 30),
+  `appName` (the service name: 2 to 31 lowercase letters, digits or `-`, starting with a letter;
+  not `api`, `health`, `admin` or `static`), `packageName` (e.g. `com.acme.notes`) and an
+  absolute `outputDir`. Optional: `sharing` (default `false`), `templateRef`. It never
+  overwrites a non-empty folder. `CMPOSE_BACKEND_TEMPLATE_DIR` (the absolute path of a backend
+  template checkout) generates from that checkout instead of the pinned tag.
 
 ## How it works
 
@@ -105,7 +123,8 @@ Generation runs entirely on your machine. The first call downloads the pinned te
 `~/.cache/cmpose` (override with `CMPOSE_CACHE_DIR`), and later calls reuse it. Games come the
 same way from the pinned game template
 ([whinstudio/cmpose-game-template](https://github.com/whinstudio/cmpose-game-template)); Unity
-never runs during generation. Each release pins one tag of each template, so `@cmpose/mcp@x.y.z`
+never runs during generation. Backends come from the pinned backend template
+(`whinstudio/cmpose-backend-template`). Each release pins one tag of each template, so `@cmpose/mcp@x.y.z`
 always generates the same project.
 
 Source and issues: [github.com/whinstudio/cmpose](https://github.com/whinstudio/cmpose).

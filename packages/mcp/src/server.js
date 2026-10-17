@@ -8,6 +8,7 @@ const pkg = require('../package.json');
 const { describe } = require('./describe');
 const { runGenerate } = require('./generate');
 const { runGameGenerate } = require('./gameGenerate');
+const { runBackendGenerate } = require('./backendGenerate');
 
 const GENERATE_DESCRIPTION = 'Generate a Compose Multiplatform (Android + iOS) project on this machine. ' +
     'Call cmp_describe first for the options, defaults and validation rules. ' +
@@ -16,6 +17,10 @@ const GENERATE_DESCRIPTION = 'Generate a Compose Multiplatform (Android + iOS) p
 const GAME_GENERATE_DESCRIPTION = 'Generate a Unity 6 (Android + iOS) mobile game project on this machine. ' +
     'Call game_describe first for the flags, defaults and validation rules. ' +
     'showcase has every flag on; flags and features apply to blank only. ' +
+    'Writes <outputDir>/<projectName>; never overwrites an existing non-empty folder.';
+
+const BACKEND_GENERATE_DESCRIPTION = 'Generate a standalone Kotlin/Ktor backend (Docker-ready) on this machine. ' +
+    'Call backend_describe first. ' +
     'Writes <outputDir>/<projectName>; never overwrites an existing non-empty folder.';
 
 // MCP progress notifications for a tool call that sent a progress token
@@ -32,7 +37,8 @@ function progressReporter(extra, total) {
     };
 }
 
-function createServer({ cacheDir, remoteUrl } = {}) {
+// backendTemplateDir: a local backend template checkout used instead of the template cache (CMPOSE_BACKEND_TEMPLATE_DIR)
+function createServer({ cacheDir, remoteUrl, backendTemplateDir = process.env.CMPOSE_BACKEND_TEMPLATE_DIR || null } = {}) {
     const server = new McpServer({ name: 'cmpose', version: pkg.version });
 
     server.registerTool('cmp_describe', {
@@ -94,6 +100,29 @@ function createServer({ cacheDir, remoteUrl } = {}) {
         }
     }, async (args, extra) => runGameGenerate(args, {
         cacheDir, remoteUrl, onProgress: progressReporter(extra, 2), generatorVersion: `mcp@${pkg.version}`
+    }));
+
+    server.registerTool('backend_describe', {
+        description: 'Describe the Kotlin/Ktor backend generator: options, appName rules, the project anatomy, the pinned backend template ' +
+            'and the conventions to follow when writing code in a generated backend.',
+        inputSchema: {}
+    }, async () => {
+        const facts = core.backend.describeBackend();
+        return { content: [{ type: 'text', text: JSON.stringify(facts, null, 2) }], structuredContent: facts };
+    });
+
+    server.registerTool('backend_generate', {
+        description: BACKEND_GENERATE_DESCRIPTION,
+        inputSchema: {
+            projectName: z.string().describe('Letters only, no spaces (e.g. NotesBackend)'),
+            appName: z.string().describe('Service name: 2-31 lowercase letters, digits or -, starting with a letter (e.g. notes-api)'),
+            packageName: z.string().describe('Reverse-domain Kotlin package (e.g. com.example.notes)'),
+            outputDir: z.string().describe('Absolute path of the folder to create the project in'),
+            sharing: z.boolean().optional().describe('Spaces shared between users with roles and invitations (default false)'),
+            templateRef: z.string().optional().describe('Override the pinned backend template tag')
+        }
+    }, async (args, extra) => runBackendGenerate(args, {
+        cacheDir, remoteUrl, templateDir: backendTemplateDir, onProgress: progressReporter(extra, 2), generatorVersion: `mcp@${pkg.version}`
     }));
 
     return server;

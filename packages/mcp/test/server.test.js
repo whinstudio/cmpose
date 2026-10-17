@@ -19,10 +19,10 @@ async function connect(options) {
     return { client, close: () => client.close() };
 }
 
-test('lists the four tools and describes the contract', async () => {
+test('lists the six tools and describes the contract', async () => {
     const { client, close } = await connect({});
     const { tools } = await client.listTools();
-    assert.deepStrictEqual(tools.map((t) => t.name).sort(), ['cmp_describe', 'cmp_generate', 'game_describe', 'game_generate']);
+    assert.deepStrictEqual(tools.map((t) => t.name).sort(), ['backend_describe', 'backend_generate', 'cmp_describe', 'cmp_generate', 'game_describe', 'game_generate']);
     const r = await client.callTool({ name: 'cmp_describe', arguments: {} });
     assert.strictEqual(r.structuredContent.template.ref, core.pins.cmp.ref);
     assert.strictEqual(r.structuredContent.contract.limits.rateLimitMax, undefined);
