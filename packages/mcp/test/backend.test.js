@@ -99,10 +99,10 @@ test('backend_generate refuses a relative outputDir and a path-like templateRef'
     assert.match(textOf(await run({ templateRef: '../x' })), /- templateRef: /);
 });
 
-test('backend_generate on the PENDING pin explains how to proceed instead of downloading', async (t) => {
+test('backend_generate on a PENDING ref explains how to proceed instead of downloading', async (t) => {
     const { outputDir, calls, run } = await setup(t);
-    assert.match(core.pins.backend.ref, /-PENDING$/);
-    const r = await run({ templateRef: undefined });
+    // The pin is PENDING until the first template tag; a released pin must not hide this path
+    const r = await run({ templateRef: 'backend-template-PENDING' });
     assert.strictEqual(r.isError, true);
     assert.match(textOf(r), /not released yet; pass templateRef or set CMPOSE_BACKEND_TEMPLATE_DIR/);
     assert.deepStrictEqual(calls, []);
