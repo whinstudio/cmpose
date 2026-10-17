@@ -132,3 +132,16 @@ test('a malformed iosVersion gets a format message, an out-of-range one the rang
     }
     for (const iosVersion of ['14.0', '99', '26.20']) assert.match(validateGame({ ...base, iosVersion }).error, /^iosVersion must be from 15\.0 to /);
 });
+
+test('theme: optional, an object of known fields, colours as #RRGGBB (uppercased)', () => {
+    assert.strictEqual(ok(base).theme, null);
+    assert.deepStrictEqual(ok({ ...base, theme: { family: 'neon', primary: '#ff00aa', fontPair: 'outfit-exo2' } }).theme,
+        { family: 'neon', primary: '#FF00AA', fontPair: 'outfit-exo2' });
+    assert.deepStrictEqual(ok({ ...base, templateType: 'blank', theme: {} }).theme, {});
+    for (const theme of ['clean', [], null, 5]) assert.strictEqual(validateGame({ ...base, theme }).error, 'theme must be an object');
+    bad({ ...base, theme: { primary: '#FF0' } }, 'theme\\.primary');
+    bad({ ...base, theme: { accent: 'blue' } }, 'theme\\.accent');
+    bad({ ...base, theme: { family: 7 } }, 'theme\\.family');
+    bad({ ...base, theme: { fontPair: 7 } }, 'theme\\.fontPair');
+    bad({ ...base, theme: { mood: 'happy' } }, 'theme has unknown fields: mood');
+});

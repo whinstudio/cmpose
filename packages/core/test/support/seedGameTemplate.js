@@ -243,7 +243,10 @@ function fullFlags(flags) {
     return out;
 }
 
-async function seedGameTemplate(dir, { full = false, legacyCi = false } = {}) {
+// themes: true copies the real template's .cmpose/themes.json (the six style families); older pins have none
+const THEMES_JSON = path.join(__dirname, '..', 'fixtures', 'game', 'themes.json');
+
+async function seedGameTemplate(dir, { full = false, legacyCi = false, themes = false } = {}) {
     const f = (rel, content) => fs.outputFile(path.join(dir, rel), content);
     const folder = (rel, guid) => f(`${rel}.meta`, meta(guid, true));
     const asset = async (rel, guid, content) => { await f(rel, content); await f(`${rel}.meta`, meta(guid)); };
@@ -258,6 +261,7 @@ async function seedGameTemplate(dir, { full = false, legacyCi = false } = {}) {
     await f('Packages/manifest.json', json(PACKAGES, 2));
     await f('README.md', legacyCi ? README + LEGACY_CI_README : README);
     if (legacyCi) await f('.github/workflows/ci.yml', CI);
+    if (themes) await fs.copy(THEMES_JSON, path.join(dir, '.cmpose', 'themes.json'));
 
     await folder(P, GUIDS.project);
 
@@ -334,4 +338,4 @@ async function seedGameTemplate(dir, { full = false, legacyCi = false } = {}) {
     return dir;
 }
 
-module.exports = { seedGameTemplate, SEED_GUIDS: GUIDS };
+module.exports = { seedGameTemplate, SEED_GUIDS: GUIDS, THEMES_JSON };
