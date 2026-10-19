@@ -1,6 +1,6 @@
 {
   "name": "@cmpose/core",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "cmpose project generator core (Compose Multiplatform)",
   "license": "MIT",
   "repository": {
@@ -8,7 +8,7 @@
     "url": "git+https://github.com/whinstudio/cmpose.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/whinstudio/cmpose/tree/main/packages/core#readme",
+  "homepage": "https://github.com/whinstudio/cmpose/tree/develop/packages/core#readme",
   "bugs": {
     "url": "https://github.com/whinstudio/cmpose/issues"
   },
