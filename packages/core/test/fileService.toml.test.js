@@ -34,6 +34,7 @@ const KTOR_KEYS = {
         'ktor-client-core',
         'ktor-client-darwin',
         'ktor-client-logging',
+        'ktor-client-mock',
         'ktor-serialization-kotlinx-json',
         'coil-network-ktor3'
     ]
@@ -218,6 +219,7 @@ test('removing ktor keeps every *-plugin alias and removes exactly the ktor vers
     assert.ok(!/^ktor-client-core\s*=/m.test(out), out);
     assert.ok(!/^ktor-client-darwin\s*=/m.test(out), out);
     assert.ok(!/^ktor-client-logging\s*=/m.test(out), out);
+    assert.ok(!/^ktor-client-mock\s*=/m.test(out), out);
     assert.ok(!/^ktor-serialization-kotlinx-json\s*=/m.test(out), out);
     assert.ok(!/^coil-network-ktor3\s*=/m.test(out), out);
 
@@ -229,7 +231,7 @@ test('removing ktor keeps every *-plugin alias and removes exactly the ktor vers
     assert.ok(out.includes('coil = "3.4.0"'), out);
     assert.ok(/^coil-compose\s*=/m.test(out), out);
 
-    assert.equal(content.split('\n').length - out.split('\n').length, 8, 'exactly 8 lines removed (1 version + 7 libraries)');
+    assert.equal(content.split('\n').length - out.split('\n').length, 9, 'exactly 9 lines removed (1 version + 8 libraries)');
 });
 
 test('removing detekt removes the detekt keys in versions/libraries/plugins but not the *-plugin convention aliases', async () => {
@@ -308,7 +310,7 @@ test('for a neutral package (dev.cmpose.app), removeTomlEntries matches the old 
 // full processBlankApp -> processCoreFeatures pipeline, so they fail if any of
 // the five call sites stop matching the real catalog.
 
-// The exact 18 lines the real catalog's four disabled features (networkMonitor,
+// The exact 19 lines the real catalog's four disabled features (networkMonitor,
 // ktor, datastore, detekt) must remove - transcribed independently from the
 // fixture, not derived from the same key-list constants processCoreFeatures uses,
 // so a typo in either place is caught.
@@ -326,6 +328,7 @@ const REMOVED_LINES_DOKTOR = [
     'ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktorClientCore" }',
     'ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktorClientCore" }',
     'ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktorClientCore" }',
+    'ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktorClientCore" }',
     'ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktorClientCore" }',
     'coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }',
     'networkMonitor-debug = { module = "com.kturker:networkmonitor", version.ref = "networkMonitor" }',
@@ -376,7 +379,7 @@ test('processBlankApp on a real gradle/libs.versions.toml (doktor fixture) remov
 
         const originalLines = originalContent.split('\n');
         const outLines = out.split('\n');
-        assert.equal(originalLines.length - outLines.length, 18, 'exactly 18 catalog lines must be removed');
+        assert.equal(originalLines.length - outLines.length, 19, 'exactly 19 catalog lines must be removed');
 
         const expected = originalLines.filter(line => !REMOVED_LINES_DOKTOR.includes(line)).join('\n');
         assert.equal(out, expected);
@@ -397,6 +400,7 @@ test('network off removes ktor-client-logging but keeps [versions] kermit, kermi
 
         const out = await fs.readFile(path.join(dir, 'gradle', 'libs.versions.toml'), 'utf8');
         assert.ok(!/^ktor-client-logging\s*=/m.test(out), out);
+    assert.ok(!/^ktor-client-mock\s*=/m.test(out), out);
         assert.ok(!/^\s*(?:ktorClientCore|ktor-[A-Za-z0-9-]+)\s*=/m.test(out), out);
         assert.ok(/\[versions\][^[]*^kermit = "2\.2\.0"$/m.test(out), out);
         assert.ok(out.includes('kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }'), out);

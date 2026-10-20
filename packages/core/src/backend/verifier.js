@@ -8,6 +8,9 @@ const { identityPairs } = require('./identity');
 const MARKER_RE = /^[ \t]*(?:\/\/|--|#|<!--)[ \t]*\/?cmpose:/m;
 // The template gate's sharing words, in the code, docs and deploy parts
 const SHARING_WORDS = /space|invite|member/i;
+// The template gate's sample words (no_sample_words), in the same parts
+const SAMPLE_WORDS = /feature[./]sample|\/items|Item(Repository|Routes|Table|Dto|OpenApi)|V3__sample/;
+const SAMPLE_MIGRATION = 'V3__sample.sql';
 const SHARING_TARGETS = ['src', 'SECURITY-CHECKLIST.md', 'deploy', 'README.md'];
 const SECRET_PATTERNS = [
     { name: 'private key', re: /-----BEGIN .*PRIVATE KEY-----/ },
@@ -35,7 +38,7 @@ async function listFiles(dir, rel = '', out = []) {
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Problems of a generated backend project (empty = clean), sorted */
-async function verifyBackendProject(projectDir, { sharing, packageName, appName, projectName = '' }) {
+async function verifyBackendProject(projectDir, { sharing, sample, packageName, appName, projectName = '' }) {
     const problems = [];
     const pairs = identityPairs({ packageName, appName, projectName });
     // A template token the project's own names spell (a package io.cmpose.backendtemplatex) is not residue
@@ -51,15 +54,19 @@ async function verifyBackendProject(projectDir, { sharing, packageName, appName,
         }
         if (rel.split('/')[0] !== MARKER_SKIPPED && MARKER_RE.test(text)) problems.push(`marker left in ${rel}`);
         if (rel.startsWith('tools/') && !KEPT_TOOLS.includes(rel)) problems.push(`template tool left in ${rel}`);
-        if (!sharing && SHARING_TARGETS.some((t) => rel === t || rel.startsWith(`${t}/`))) {
+        if (SHARING_TARGETS.some((t) => rel === t || rel.startsWith(`${t}/`))) {
             const own = ownNamesRe ? text.replace(ownNamesRe, '') : text;
-            if (SHARING_WORDS.test(own)) problems.push(`sharing word in ${rel} (sharing is off)`);
+            if (!sharing && SHARING_WORDS.test(own)) problems.push(`sharing word in ${rel} (sharing is off)`);
+            if (sample === false && SAMPLE_WORDS.test(own)) problems.push(`sample word in ${rel} (sample is off)`);
         }
+        if (sample === false && path.posix.basename(rel) === SAMPLE_MIGRATION) problems.push(`sample migration ${rel} left (sample is off)`);
         for (const { name, re } of SECRET_PATTERNS) if (re.test(text)) problems.push(`${name} in ${rel}`);
     }
 
     const packageDir = path.posix.join('src', 'main', 'kotlin', ...packageName.split('.'));
     if (!(await fs.pathExists(path.join(projectDir, packageDir)))) problems.push(`missing package dir ${packageDir}`);
+    const sampleDir = path.posix.join(packageDir, 'feature', 'sample');
+    if (sample === false && (await fs.pathExists(path.join(projectDir, sampleDir)))) problems.push(`sample dir ${sampleDir} left (sample is off)`);
     for (const rel of [`deploy/docker-compose.${appName}.yml`, `deploy/nginx/${appName}.conf`]) {
         if (!(await fs.pathExists(path.join(projectDir, rel)))) problems.push(`missing ${rel}`);
     }

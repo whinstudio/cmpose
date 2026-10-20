@@ -6,7 +6,7 @@ const { z } = require('zod');
 const core = require('@cmpose/core');
 const pkg = require('../package.json');
 const { describe } = require('./describe');
-const { runGenerate } = require('./generate');
+const { runGenerate, progressSteps } = require('./generate');
 const { runGameGenerate, runGameDescribe } = require('./gameGenerate');
 const { runBackendGenerate } = require('./backendGenerate');
 
@@ -68,10 +68,11 @@ function createServer({ cacheDir, remoteUrl, backendTemplateDir = process.env.CM
             minSdk: z.union([z.string(), z.number()]).optional().describe('Android min SDK, e.g. "24" or 24'),
             iosVersion: z.union([z.string(), z.number()]).optional().describe('iOS deployment target, e.g. "15.0"'),
             ci: z.boolean().optional(),
-            templateRef: z.string().optional().describe('Override the pinned template tag')
+            templateRef: z.string().optional().describe('Override the pinned template tag'),
+            backendTemplateRef: z.string().optional().describe('Override the pinned backend template tag (blank with backend only)')
         }
     }, async (args, extra) => runGenerate(args, {
-        cacheDir, remoteUrl, onProgress: progressReporter(extra, 2), generatorVersion: `mcp@${pkg.version}`
+        cacheDir, remoteUrl, backendTemplateDir, onProgress: progressReporter(extra, progressSteps(args)), generatorVersion: `mcp@${pkg.version}`
     }));
 
     server.registerTool('game_describe', {
@@ -129,6 +130,7 @@ function createServer({ cacheDir, remoteUrl, backendTemplateDir = process.env.CM
             packageName: z.string().describe('Reverse-domain Kotlin package (e.g. com.example.notes)'),
             outputDir: z.string().describe('Absolute path of the folder to create the project in'),
             sharing: z.boolean().optional().describe('Spaces shared between users with roles and invitations (default false)'),
+            sample: z.boolean().optional().describe('Include the sample items feature (default true)'),
             templateRef: z.string().optional().describe('Override the pinned backend template tag')
         }
     }, async (args, extra) => runBackendGenerate(args, {

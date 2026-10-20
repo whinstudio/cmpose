@@ -1,6 +1,7 @@
 const { log } = require('./log');
 const fs = require('fs-extra');
 const path = require('path');
+const { INCLUDE_SERVER_BUILD, SERVER_DIR } = require('./serverFromBackend');
 
 // The generated README's requirements table and module map. The template's README marks
 // both sections (<!-- cmpose:requirements --> … <!-- /cmpose:requirements -->); a README without
@@ -24,7 +25,7 @@ const CORE_DESCRIPTIONS = {
     update: 'app updates: Play In-App Updates, the App Store lookup and an optional minimum version',
     ads: 'AdMob ads and consent (test IDs)',
     room: 'Room database (bundled SQLite): AppDatabase, DAOs and schemas',
-    api: 'models and routes shared by the app and the server',
+    api: "the app's client models and routes for the backend API, checked by ApiContractTest",
     auth: "Firebase sign-in: email, Google, Apple; the server client's token"
 };
 
@@ -48,7 +49,12 @@ function renderRequirements(versions, { minSdk, iosVersion }) {
     ].join('\n');
 }
 
-function renderModules(settingsContent) {
+// server/ is an included build (INCLUDE_SERVER_BUILD), not a module
+const SERVER_LINE = '- `server/`: Ktor server from the cmpose backend template (an included build): sign-in check, spaces, sharing, files; '
+    + '`./gradlew :server:runLocal`; deploying: `server/deploy/README.md`';
+
+// serverDir: whether the project has server/ (the settings include it only when it is there)
+function renderModules(settingsContent, { serverDir = false } = {}) {
     const paths = [...settingsContent.matchAll(/^\s*include\(([^)]*)\)/gm)]
         .flatMap((m) => [...m[1].matchAll(/"(:?[^"]+)"/g)].map((q) => q[1]))
         .map((p) => (p.startsWith(':') ? p : `:${p}`));
@@ -66,9 +72,7 @@ function renderModules(settingsContent) {
         const layers = paths.filter((x) => x.startsWith(`:feature:${feature}:`)).map((x) => x.split(':')[3]).sort();
         lines.push(layers.length ? `- \`:feature:${feature}\`: ${layers.join(', ')}` : `- \`:feature:${feature}\``);
     }
-    if (paths.includes(':server')) {
-        lines.push('- `:server`: Ktor server: sign-in check, spaces, sharing, files; `./gradlew :server:runLocal`');
-    }
+    if (serverDir && INCLUDE_SERVER_BUILD.test(settingsContent)) lines.push(SERVER_LINE);
     return lines.join('\n');
 }
 
@@ -99,7 +103,8 @@ async function fillReadme(projectPath, { versions, minSdk, iosVersion }) {
         if (!content.includes('<!-- cmpose:requirements -->') && !content.includes('<!-- cmpose:modules -->')) return false;
         const settings = await fs.readFile(path.join(projectPath, 'settings.gradle.kts'), 'utf8').catch(() => '');
         let updated = replaceBetweenMarkers(content, 'cmpose:requirements', renderRequirements(versions, { minSdk, iosVersion }));
-        updated = replaceBetweenMarkers(updated, 'cmpose:modules', renderModules(settings));
+        const serverDir = await fs.pathExists(path.join(projectPath, SERVER_DIR));
+        updated = replaceBetweenMarkers(updated, 'cmpose:modules', renderModules(settings, { serverDir }));
         await fs.writeFile(readmePath, updated);
         return true;
     } catch (error) {

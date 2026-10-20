@@ -1,9 +1,12 @@
 const fs = require('fs-extra');
 const path = require('path');
+const { execFile } = require('child_process');
+const { log } = require('./log');
 const { listTextFiles } = require('./projectFiles');
 const { escapeRegExp, findResidue, BACKEND_RESIDUE_TOKENS } = require('./fileService');
-const { TEST_SOURCE_SET_REGEX } = require('./featureModules');
+const { TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('./featureModules');
 const { OLD_PACKAGE_NAME } = require('./templateIdentity');
+const { SERVER_DIR, INCLUDE_SERVER_BUILD, serverPackageOf } = require('./serverFromBackend');
 
 // The template's own identity: if it is left in a generated project, the rename missed a spot.
 // The user's input can carry the same text (appName accepts dots and letters, ≤30; the project name
@@ -81,8 +84,6 @@ function capitalize(name) {
 }
 
 const relPath = (projectPath, file) => path.relative(projectPath, file).split(path.sep).join('/');
-// The one test source set blank keeps: the Android-host Koin graph check
-const KOIN_GRAPH_TEST_DIR = 'shared/src/androidHostTest/';
 
 // Blank's shell wires the theme and the strings through its layers; Theming off leaves
 // no reference to the theme packages it removes; no template test ships (Compass's test gate).
@@ -118,7 +119,7 @@ async function verifyBlankShell(projectPath, input, problems) {
     for (const file of files) {
         const filePath = relPath(projectPath, file);
         const match = filePath.match(TEST_SOURCE_SET_REGEX);
-        if (!match || filePath.startsWith(KOIN_GRAPH_TEST_DIR)) continue;
+        if (!match || BLANK_KEPT_TEST_DIRS.some((dir) => filePath.startsWith(dir))) continue;
         const dir = filePath.slice(0, match.index + match[0].length - 1);
         problems.add(`${dir}: template tests in a blank project (Compass counts every iOS test as the agent's)`);
     }
@@ -498,8 +499,8 @@ async function readIfExists(file) {
 // Backend: blank keeps the server, core/api, core/auth, feature/account and feature/sharing exactly when its
 // backend flag is on, wired, with the Google Sign-In URL scheme left to the build setting; otherwise (and
 // always in showcase) none of them and no reference to them. No cmpose:backend marker is ever left.
+// server/ is the backend template, an included build (includeBuild("server")), so it is checked apart from the modules.
 const BACKEND_MODULES = [
-    { dir: 'server', build: 'server/build.gradle.kts', include: ':server' },
     { dir: 'core/api', build: 'core/api/build.gradle.kts', include: ':core:api' },
     { dir: 'core/auth', build: 'core/auth/build.gradle.kts', include: ':core:auth' },
     { dir: 'feature/account', build: 'feature/account/presentation/build.gradle.kts', include: ':feature:account:presentation' },
@@ -509,6 +510,44 @@ const BACKEND_SHARED_DEPENDENCIES = ['projects.core.auth', 'projects.feature.acc
 const BACKEND_KOIN_MODULES = ['AuthModule', 'AccountModule', 'SharingModule'];
 const GOOGLE_URL_SCHEME = '<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>';
 const BACKEND_MARKER = 'cmpose:backend';
+const LOCAL_SERVER_DIR = /^[ \t]*localServerDir[ \t]*=[ \t]*\.\.\/\.local-server[ \t]*$/m;
+const BACKEND_TEMPLATE_PACKAGE = 'io.cmpose.backendtemplate';
+const SERVER_PRUNED = new Set(['.git', '.gradle', '.kotlin', 'build', '.local-server']);
+
+// Every file under server/ (build output aside) holding the backend template's own package: the rename missed it
+async function serverTemplateResidue(projectPath, rel = SERVER_DIR, out = []) {
+    for (const entry of await fs.readdir(path.join(projectPath, rel), { withFileTypes: true })) {
+        if (SERVER_PRUNED.has(entry.name)) continue;
+        const child = `${rel}/${entry.name}`;
+        if (child.includes(BACKEND_TEMPLATE_PACKAGE.replace(/\./g, '/'))) out.push(child);
+        if (entry.isDirectory()) {
+            await serverTemplateResidue(projectPath, child, out);
+        } else if (entry.isFile()) {
+            const buffer = await fs.readFile(path.join(projectPath, child));
+            if (!buffer.includes(0) && buffer.toString('utf8').includes(BACKEND_TEMPLATE_PACKAGE)) out.push(child);
+        }
+    }
+    return out;
+}
+
+async function verifyServer(projectPath, input, settings, problems) {
+    const exists = (rel) => fs.pathExists(path.join(projectPath, rel));
+    for (const rel of ['server/settings.gradle.kts', 'server/build.gradle.kts']) {
+        if (!(await exists(rel))) problems.add(`${rel}: missing although backend is on`);
+    }
+    if (!INCLUDE_SERVER_BUILD.test(settings)) problems.add('settings.gradle.kts: includeBuild("server") missing although backend is on');
+    if (!LOCAL_SERVER_DIR.test(await readIfExists(path.join(projectPath, SERVER_DIR, 'gradle.properties')))) {
+        problems.add('server/gradle.properties: localServerDir=../.local-server missing (the local server lives in the root .local-server/)');
+    }
+    if (await exists('server/.github')) problems.add('server/.github: the backend template\'s CI left (the project\'s own CI builds server/)');
+    const serverPath = serverPackageOf(input.packageName).replace(/\./g, '/');
+    for (const rel of [`server/src/main/kotlin/${serverPath}`, `server/src/local/kotlin/${serverPath}/local/LocalMain.kt`]) {
+        if (!(await exists(rel))) problems.add(`${rel}: missing although backend is on`);
+    }
+    // A package that spells the template's own (io.cmpose.backendtemplate.x) is the user's, not residue
+    if (!(await exists(SERVER_DIR)) || input.packageName.includes(BACKEND_TEMPLATE_PACKAGE)) return;
+    for (const rel of new Set(await serverTemplateResidue(projectPath))) problems.add(`${rel}: ${BACKEND_TEMPLATE_PACKAGE} left`);
+}
 
 async function verifyBackend(projectPath, input, cfg, problems) {
     const on = input.templateType === 'blank' && cfg.backend === true;
@@ -520,7 +559,7 @@ async function verifyBackend(projectPath, input, cfg, problems) {
 
     if (!on) {
         const where = input.templateType === 'blank' ? 'although backend is off' : 'in a showcase project';
-        for (const { dir } of BACKEND_MODULES) {
+        for (const dir of [SERVER_DIR, ...BACKEND_MODULES.map((m) => m.dir)]) {
             if (await exists(dir)) problems.add(`${dir}: present ${where}`);
         }
         const tokens = BACKEND_RESIDUE_TOKENS.filter((token) => token.label !== BACKEND_MARKER);
@@ -535,6 +574,7 @@ async function verifyBackend(projectPath, input, cfg, problems) {
         if (!(await exists(build))) problems.add(`${build}: missing although backend is on`);
         if (!settings.includes(`"${include}"`)) problems.add(`settings.gradle.kts: ${include} not included`);
     }
+    await verifyServer(projectPath, input, settings, problems);
     const sharedBuild = await readIfExists(path.join(projectPath, 'shared', 'build.gradle.kts'));
     for (const dependency of BACKEND_SHARED_DEPENDENCIES) {
         if (!new RegExp(`\\b${escapeRegExp(dependency)}(?![A-Za-z0-9.])`).test(sharedBuild)) {
@@ -554,12 +594,77 @@ async function verifyBackend(projectPath, input, cfg, problems) {
     }
 }
 
+// One version for both platforms (the server's X-Client-Version check compares it): the iOS MARKETING_VERSION equals
+// AppConfig.versionName. Keyed on both values, so a template without them (staging, an older tag) is not checked.
+async function verifyAppVersion(projectPath, problems) {
+    const xcconfig = await readIfExists(path.join(projectPath, 'iosApp/Configuration/Config.xcconfig'));
+    const marketing = xcconfig.match(/^[ \t]*MARKETING_VERSION[ \t]*=[ \t]*([^\s]+)[ \t]*$/m);
+    const appConfig = await readIfExists(path.join(projectPath, 'build-logic/src/main/kotlin/config/AppConfig.kt'));
+    const part = (name) => (appConfig.match(new RegExp(`\\b${name}\\s*=\\s*(\\d+)\\b`)) || [])[1];
+    const [major, minor, patch] = ['versionMajor', 'versionMinor', 'versionPatch'].map(part);
+    if (!marketing || major === undefined || minor === undefined || patch === undefined) return;
+    const versionName = `${major}.${minor}.${patch}`;
+    if (marketing[1] !== versionName) problems.add(`iOS MARKETING_VERSION (${marketing[1]}) must equal AppConfig.versionName (${versionName})`);
+}
+
+const run = (command, args, options) => new Promise((resolve) => {
+    execFile(command, args, { maxBuffer: 64 * 1024 * 1024, ...options }, (error, stdout, stderr) => resolve({ error, stdout, stderr }));
+});
+const DOCKER_INFO_TIMEOUT_MS = 20000;
+const DOCKER_BUILD_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** The server image check: docker build -f server/deploy/Dockerfile server. { status: 'PASS' | 'SKIP' | 'FAIL', detail };
+ * SKIP when Docker (the docker command and its daemon) is not available */
+async function checkServerImage(projectPath, { docker = 'docker' } = {}) {
+    const info = await run(docker, ['info', '--format', '{{.ServerVersion}}'], { timeout: DOCKER_INFO_TIMEOUT_MS });
+    if (info.error) return { status: 'SKIP', detail: 'Docker is not available' };
+    const build = await run(docker, ['build', '--quiet', '-f', path.join(SERVER_DIR, 'deploy', 'Dockerfile'), SERVER_DIR],
+        { cwd: projectPath, timeout: DOCKER_BUILD_TIMEOUT_MS });
+    if (build.error) {
+        const tail = `${build.stderr || build.error.message}`.trim().split('\n').slice(-5).join(' | ');
+        return { status: 'FAIL', detail: tail };
+    }
+    // The image itself is not kept (the build cache is)
+    const image = build.stdout.trim().split('\n').pop();
+    if (image) await run(docker, ['image', 'rm', image], { timeout: DOCKER_INFO_TIMEOUT_MS });
+    return { status: 'PASS', detail: image };
+}
+
+const SERVER_IMAGE_ENV = 'CMPOSE_SERVER_IMAGE_CHECK';
+const NOT_REQUESTED = `not requested (set ${SERVER_IMAGE_ENV}=1)`;
+
+/** Which server image check runs, null = none. Opt-in: the option (a check function, true for the Docker check, false
+ * for none) wins; without it, CMPOSE_SERVER_IMAGE_CHECK=1 asks for the Docker check. Generation for an end user never
+ * pays minutes for an image or loses a valid project to the network. */
+function resolveServerImageCheck(option, env = process.env) {
+    if (typeof option === 'function') return option;
+    if (option === true) return checkServerImage;
+    if (option === false) return null;
+    return env[SERVER_IMAGE_ENV] === '1' ? checkServerImage : null;
+}
+
+// The server image builds (the backend template's own gate does not build it with the app's server package); skipped
+// without Docker, and unless asked for
+async function verifyServerImage(projectPath, serverImageCheck, problems) {
+    const { status, detail } = serverImageCheck
+        ? await serverImageCheck(projectPath)
+        : { status: 'SKIP', detail: NOT_REQUESTED };
+    if (status === 'FAIL') {
+        problems.add(`server/deploy/Dockerfile: the server image does not build (docker build -f server/deploy/Dockerfile server): ${detail}`);
+    } else {
+        log.info(`${status === 'PASS' ? '✅' : '⏭️'} server image: ${status}${status === 'SKIP' && detail ? ` (${detail})` : ''}`);
+    }
+}
+
 /**
  * Checks the generated project right before it is zipped; throws if anything is wrong (the request fails).
  * @param {string} projectPath
  * @param {{ projectName: string, appName: string, packageName: string, templateType: string, features: string[], featuresConfig?: object | null }} input
+ * @param {{ serverImageCheck?: boolean | ((projectPath: string) => Promise<{ status: 'PASS' | 'SKIP' | 'FAIL', detail?: string }>),
+ *   env?: object }} [options] the server image check (backend on; resolveServerImageCheck: opt-in, the option or
+ *   CMPOSE_SERVER_IMAGE_CHECK=1 in env), run last and only when nothing else failed
  */
-async function verifyGeneratedProject(projectPath, input) {
+async function verifyGeneratedProject(projectPath, input, { serverImageCheck, env = process.env } = {}) {
     const packagePath = input.packageName.replace(/\./g, '/');
     const problems = new Set();
 
@@ -666,6 +771,13 @@ async function verifyGeneratedProject(projectPath, input) {
     // 14. Backend: the server and its modules exactly when blank's backend flag is on, no residue otherwise
     await verifyBackend(projectPath, input, input.featuresConfig || {}, problems);
 
+    // 15. One app version for both platforms
+    await verifyAppVersion(projectPath, problems);
+
+    // 16. The server image, last: it takes minutes, so only a project that passed everything else is built
+    const backendOn = input.templateType === 'blank' && (input.featuresConfig || {}).backend === true;
+    if (backendOn && problems.size === 0) await verifyServerImage(projectPath, resolveServerImageCheck(serverImageCheck, env), problems);
+
     if (problems.size > 0) {
         // Cap the message: a badly broken generation (many unwired modules) can produce dozens of
         // lines, which is unreadable in an error response or a log line.
@@ -678,4 +790,4 @@ async function verifyGeneratedProject(projectPath, input) {
     }
 }
 
-module.exports = { verifyGeneratedProject, verifyBackend };
+module.exports = { verifyGeneratedProject, verifyBackend, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };

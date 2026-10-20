@@ -59,6 +59,23 @@ test('hash blocks: off drops the block, on keeps its lines', () => {
     assert.equal(on, toml.split('\n').filter((line) => !line.includes('cmpose:backend')).join('\n'));
 });
 
+test('ymlBackendBlockIsStrippedWhenOff', async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmp-backend-yml-'));
+    t.after(() => fs.remove(dir));
+    const ci = 'jobs:\n  android:\n    runs-on: ubuntu-latest\n'
+        + '  # cmpose:backend\n  server:\n    if: hashFiles(\'server/settings.gradle.kts\') != \'\'\n    runs-on: ubuntu-latest\n  # /cmpose:backend\n';
+    for (const enabled of [false, true]) {
+        for (const name of ['ci.yml', 'other.yaml']) await fs.outputFile(path.join(dir, '.github', 'workflows', name), ci);
+        await applyBackendOption(dir, enabled);
+        for (const name of ['ci.yml', 'other.yaml']) {
+            const out = await fs.readFile(path.join(dir, '.github', 'workflows', name), 'utf8');
+            assert.ok(!out.includes('cmpose:backend'), out);
+            assert.equal(out.includes('  server:\n'), enabled, out);
+            assert.ok(out.startsWith('jobs:\n  android:\n    runs-on: ubuntu-latest\n'), out);
+        }
+    }
+});
+
 test('blank-line collapse after a removed block leaves at most one blank line at the join', () => {
     const off = removeMarkedBlocks(read('libs.versions.toml'), 'hash', false);
     assert.ok(!off.includes('\n\n\n'));

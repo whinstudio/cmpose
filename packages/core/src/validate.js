@@ -4,6 +4,7 @@ const LIMITS = require('./limits');
 const { configureValidator } = require('./contract');
 const { parseGenerateBody } = require('./requestParser');
 const { normalizeFeaturesConfig } = require('./featuresConfig');
+const { serverPackageOf } = require('./serverFromBackend');
 
 // compile/target SDK come from the template (AppConfig.kt); a minSdk above its targetSdk cannot build
 function minSdkAboveTarget(minSdk, targetSdk) {
@@ -59,6 +60,13 @@ function validate(input, { limits = LIMITS, templateTargetSdk = null } = {}) {
         if (normalizedFeaturesConfig.network === true && normalizedFeaturesConfig.networkBaseUrl &&
             !PV.validateUrl(normalizedFeaturesConfig.networkBaseUrl)) {
             return fail(PV.messages.urlInvalid);
+        }
+        // The backend's server package is the app's plus .server (server/ from the backend template)
+        if (normalizedFeaturesConfig.backend === true) {
+            const serverPackage = serverPackageOf(packageName);
+            if (!PV.validatePackageName(serverPackage) || !PV.validateMaxLength(serverPackage, PV.MAX_LENGTH_PACKAGE_NAME)) {
+                return fail(`packageName is too long for the server package (${serverPackage})`);
+            }
         }
     }
 

@@ -22,24 +22,35 @@ function databaseNameProblem(appName) {
     return null;
 }
 
-// Every problem as { field, message }; the value holds only the known fields (sharing defaults to false)
+// Why appName cannot name a backend (null = it can): the pattern, the route prefixes, then the database name
+function appNameProblem(appName) {
+    if (typeof appName !== 'string' || !APP_NAME_RE.test(appName)) {
+        return 'appName must be 2-31 lowercase letters, digits or -, starting with a letter';
+    }
+    if (S.appName.reserved.includes(appName)) return `appName "${appName}" is reserved (${S.appName.reserved.join(', ')})`;
+    return databaseNameProblem(appName);
+}
+
+// Why ref cannot name a backend template tag (null = it can); field names the input in the message
+function templateRefProblem(ref, field = 'templateRef') {
+    if (typeof ref !== 'string' || !REF_RE.test(ref) || ref.startsWith('.')) {
+        return `${field} must be a tag or branch name (letters, digits, ., _ or -, not starting with .)`;
+    }
+    return null;
+}
+
+// Every problem as { field, message }; the value holds only the known fields (sharing defaults to false, sample to true)
 function validateBackend(input) {
     if (!isObject(input)) return { ok: false, errors: [{ field: 'input', message: 'input must be an object' }] };
-    const { projectName, appName, packageName, outputDir, sharing, templateRef } = input;
+    const { projectName, appName, packageName, outputDir, sharing, sample, templateRef } = input;
     const errors = [];
     const fail = (field, message) => errors.push({ field, message });
 
     if (typeof projectName !== 'string' || !PV.validateProjectName(projectName)) fail('projectName', PV.messages.projectNameInvalid);
     else if (projectName.length > PV.MAX_LENGTH_PROJECT_NAME) fail('projectName', PV.messages.projectNameTooLong);
 
-    if (typeof appName !== 'string' || !APP_NAME_RE.test(appName)) {
-        fail('appName', 'appName must be 2-31 lowercase letters, digits or -, starting with a letter');
-    } else if (S.appName.reserved.includes(appName)) {
-        fail('appName', `appName "${appName}" is reserved (${S.appName.reserved.join(', ')})`);
-    } else {
-        const problem = databaseNameProblem(appName);
-        if (problem) fail('appName', problem);
-    }
+    const nameProblem = appNameProblem(appName);
+    if (nameProblem) fail('appName', nameProblem);
 
     if (typeof packageName !== 'string' || !PV.validatePackageName(packageName) || isTemplatePackage(packageName)) {
         fail('packageName', PV.messages.packageNameInvalid);
@@ -50,15 +61,21 @@ function validateBackend(input) {
     if (typeof outputDir !== 'string' || !path.isAbsolute(outputDir)) fail('outputDir', 'outputDir must be an absolute path');
 
     if (sharing !== undefined && typeof sharing !== 'boolean') fail('sharing', 'sharing must be true or false');
+    if (sample !== undefined && typeof sample !== 'boolean') fail('sample', 'sample must be true or false');
 
-    if (templateRef !== undefined && (typeof templateRef !== 'string' || !REF_RE.test(templateRef) || templateRef.startsWith('.'))) {
-        fail('templateRef', 'templateRef must be a tag or branch name (letters, digits, ., _ or -, not starting with .)');
+    if (templateRef !== undefined) {
+        const problem = templateRefProblem(templateRef);
+        if (problem) fail('templateRef', problem);
     }
 
     if (errors.length) return { ok: false, errors };
-    const value = { projectName, appName, packageName, outputDir, sharing: sharing === undefined ? S.options.sharing.default : sharing };
+    const value = {
+        projectName, appName, packageName, outputDir,
+        sharing: sharing === undefined ? S.options.sharing.default : sharing,
+        sample: sample === undefined ? S.options.sample.default : sample
+    };
     if (templateRef !== undefined) value.templateRef = templateRef;
     return { ok: true, value };
 }
 
-module.exports = { validateBackend };
+module.exports = { validateBackend, templateRefProblem, appNameProblem };

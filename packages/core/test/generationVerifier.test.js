@@ -4,7 +4,10 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs-extra');
 
-const { verifyGeneratedProject, verifyBackend } = require('../src/generationVerifier');
+const {
+    verifyGeneratedProject, verifyBackend, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV
+} = require('../src/generationVerifier');
+const { setLogger } = require('../src/log');
 
 const INPUT = { projectName: 'Demo', appName: 'Demo App', packageName: 'dev.cmpose.demo', templateType: 'blank', features: [] };
 const PKG = 'dev/cmpose/demo';
@@ -364,6 +367,7 @@ test('blank carries no template tests except the Android-host Koin graph check; 
         await verifyGeneratedProject(dir, { ...INPUT, templateType: 'showcase', featuresConfig: null });
     });
 });
+
 
 // Monetization (spec §10): blank keeps exactly the modules its purchases/ads flags ask for
 const MONETIZATION = (purchases, ads) => ({ ...INPUT, featuresConfig: { theming: false, multiLang: false, purchases, ads } });
@@ -1311,19 +1315,31 @@ test('blank paywall: a pre-paywall template (no PurchaseResult.kt, no Interstiti
 const BACKEND_INPUT = (backend) => ({ ...INPUT, featuresConfig: { theming: false, multiLang: backend, backend } });
 const BACKEND_PLIST = '<key>CFBundleURLSchemes</key>\n<array>\n<string>demo</string>\n</array>\n'
     + '<key>CFBundleURLSchemes</key>\n<array>\n<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>\n</array>\n';
-const BACKEND_BUILD_FILES = ['server', 'core/api', 'core/auth', 'feature/account/contract', 'feature/account/presentation',
+const BACKEND_BUILD_FILES = ['core/api', 'core/auth', 'feature/account/contract', 'feature/account/presentation',
     'feature/sharing/contract', 'feature/sharing/presentation'].map((dir) => `${dir}/build.gradle.kts`);
+// server/: the backend template as an included build
+const INCLUDE_SERVER = '// server/ is generated from the cmpose backend template (an included build)\n'
+    + 'if (file("server/settings.gradle.kts").exists()) includeBuild("server")\n';
+const SERVER_FILES = {
+    'server/settings.gradle.kts': 'rootProject.name = "demo"\n',
+    'server/build.gradle.kts': `application { mainClass.set("${INPUT.packageName}.server.MainKt") }\n`,
+    'server/gradle.properties': 'kotlin.code.style=official\nlocalServerDir=../.local-server\n',
+    [`server/src/main/kotlin/${PKG}/server/Main.kt`]: `package ${INPUT.packageName}.server\n`,
+    [`server/src/local/kotlin/${PKG}/server/local/LocalMain.kt`]: `package ${INPUT.packageName}.server.local\n`
+};
+const NO_DOCKER = async () => ({ status: 'SKIP', detail: 'test' });
 
 async function seedBackend(dir) {
     await seedValid(dir);
     const files = {
         'settings.gradle.kts': 'rootProject.name = "Demo"\ninclude(":shared")\ninclude(":core:api")\ninclude(":core:auth")\n'
             + 'include(":feature:account:contract")\ninclude(":feature:account:presentation")\n'
-            + 'include(":feature:sharing:contract")\ninclude(":feature:sharing:presentation")\ninclude(":server")\n',
+            + `include(":feature:sharing:contract")\ninclude(":feature:sharing:presentation")\n${INCLUDE_SERVER}`,
         'shared/build.gradle.kts': 'implementation(projects.core.auth)\nimplementation(projects.feature.account.presentation)\n'
             + 'implementation(projects.feature.sharing.presentation)\n',
         [INIT_KOIN]: 'add(AuthModule().module)\nadd(AccountModule().module)\nadd(SharingModule().module)\n',
-        [INFO_PLIST]: BACKEND_PLIST
+        [INFO_PLIST]: BACKEND_PLIST,
+        ...SERVER_FILES
     };
     for (const rel of BACKEND_BUILD_FILES) files[rel] = 'plugins { }\n';
     for (const [rel, content] of Object.entries(files)) await fs.outputFile(path.join(dir, rel), content);
@@ -1339,6 +1355,23 @@ test('blank backend=true: a complete backend project passes (backend)', async ()
     await withProject(async (dir) => {
         await seedBackend(dir);
         assert.deepEqual(await backendProblems(dir, BACKEND_INPUT(true)), []);
+    });
+});
+
+// The contract test checks the app's models and routes against server/: blank keeps it (Android host, so not one of
+// the iOS tests Compass counts as the agent's); core/api's common tests go like every other template test
+test("blank backend=true keeps core/api's Android-host contract test, not its common tests (backend)", async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        // multiLang follows the backend: the shell's MainScreen provides the strings
+        await fs.outputFile(path.join(dir, SHARED, 'MainScreen.kt'),
+            'package dev.cmpose.demo\nCompositionLocalProvider(LocalStringResources provides resources) { }\nlanguageManager.setSystemLanguage()\n');
+        await fs.outputFile(path.join(dir, `core/api/src/androidHostTest/kotlin/${PKG}/core/api/ApiContractTest.kt`), 'class ApiContractTest\n');
+        await verifyGeneratedProject(dir, BACKEND_INPUT(true), { serverImageCheck: NO_DOCKER });
+
+        await fs.outputFile(path.join(dir, `core/api/src/commonTest/kotlin/${PKG}/core/api/ApiModelsTest.kt`), 'class ApiModelsTest\n');
+        await assert.rejects(verifyGeneratedProject(dir, BACKEND_INPUT(true), { serverImageCheck: NO_DOCKER }),
+            /core\/api\/src\/commonTest: template tests in a blank project/);
     });
 });
 
@@ -1435,8 +1468,180 @@ test('the privacy manifest declares the account data exactly when backend is on 
             if (expected) {
                 await assert.rejects(verifyGeneratedProject(dir, input), new RegExp(`PrivacyInfo.xcprivacy: ${expected}`));
             } else {
-                await verifyGeneratedProject(dir, input);
+                await verifyGeneratedProject(dir, input, { serverImageCheck: NO_DOCKER });
             }
         });
     }
+});
+
+test('serverMissingIncludeBuildIsAProblem', async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        const settings = path.join(dir, 'settings.gradle.kts');
+        // a commented-out includeBuild does not count
+        await fs.writeFile(settings, (await fs.readFile(settings, 'utf8')).replace(/^if \(.*$/m, '// includeBuild("server")'));
+        assert.deepEqual(await backendProblems(dir, BACKEND_INPUT(true)),
+            ['settings.gradle.kts: includeBuild("server") missing although backend is on']);
+    });
+});
+
+test('serverWithGithubDirIsAProblem', async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        await fs.outputFile(path.join(dir, 'server/.github/workflows/ci.yml'), 'name: ci\n');
+        assert.deepEqual(await backendProblems(dir, BACKEND_INPUT(true)),
+            ['server/.github: the backend template\'s CI left (the project\'s own CI builds server/)']);
+    });
+});
+
+test('serverWithoutLocalServerDirIsAProblem', async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        await fs.outputFile(path.join(dir, 'server/gradle.properties'), 'kotlin.code.style=official\nlocalServerDir=.local-server\n');
+        assert.deepEqual(await backendProblems(dir, BACKEND_INPUT(true)),
+            ['server/gradle.properties: localServerDir=../.local-server missing (the local server lives in the root .local-server/)']);
+    });
+});
+
+test('a server without its package dirs, its settings or with the backend template\'s package is rejected (backend)', async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        await fs.remove(path.join(dir, `server/src/local/kotlin/${PKG}/server/local/LocalMain.kt`));
+        await fs.remove(path.join(dir, 'server/settings.gradle.kts'));
+        await fs.outputFile(path.join(dir, 'server/src/test/kotlin/io/cmpose/backendtemplate/AuthTest.kt'), 'package io.cmpose.backendtemplate\n');
+        await fs.outputFile(path.join(dir, 'server/deploy/README.md'), 'Run io.cmpose.backendtemplate.MainKt\n');
+        assert.deepEqual((await backendProblems(dir, BACKEND_INPUT(true))).sort(), [
+            'server/deploy/README.md: io.cmpose.backendtemplate left',
+            'server/settings.gradle.kts: missing although backend is on',
+            `server/src/local/kotlin/${PKG}/server/local/LocalMain.kt: missing although backend is on`,
+            'server/src/test/kotlin/io/cmpose/backendtemplate/AuthTest.kt: io.cmpose.backendtemplate left',
+            'server/src/test/kotlin/io/cmpose/backendtemplate: io.cmpose.backendtemplate left'
+        ]);
+    });
+});
+
+test('the server image check runs last for a backend project: FAIL is a problem, SKIP and PASS are not (backend)', async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        const input = { ...INPUT, featuresConfig: { theming: false, multiLang: false, backend: true } };
+        const seen = [];
+        const check = (status) => async (projectPath) => { seen.push(projectPath); return { status, detail: 'build log' }; };
+        await verifyGeneratedProject(dir, input, { serverImageCheck: check('SKIP') });
+        await verifyGeneratedProject(dir, input, { serverImageCheck: check('PASS') });
+        await assert.rejects(verifyGeneratedProject(dir, input, { serverImageCheck: check('FAIL') }),
+            /server\/deploy\/Dockerfile: the server image does not build \(docker build -f server\/deploy\/Dockerfile server\): build log/);
+        assert.deepEqual(seen, [dir, dir, dir]);
+        // not built when something else already failed, nor without the backend
+        await fs.remove(path.join(dir, 'server/gradle.properties'));
+        await assert.rejects(verifyGeneratedProject(dir, input, { serverImageCheck: check('FAIL') }), /localServerDir/);
+        await withProject(async (plain) => {
+            await seedValid(plain);
+            await verifyGeneratedProject(plain, INPUT, { serverImageCheck: check('FAIL') });
+        });
+        assert.equal(seen.length, 3);
+    });
+});
+
+test('marketingVersionMismatchIsAProblem', async () => {
+    const appConfig = (major, minor, patch) => 'object AppConfig {\n    const val versionCode = 1\n\n'
+        + `    private const val versionMajor = ${major}\n    private const val versionMinor = ${minor}\n    private const val versionPatch = ${patch}\n}\n`;
+    await withProject(async (dir) => {
+        await seedValid(dir);
+        const xcconfig = path.join(dir, 'iosApp/Configuration/Config.xcconfig');
+        await fs.appendFile(xcconfig, 'CURRENT_PROJECT_VERSION=1\nMARKETING_VERSION=1.0\n');
+        // without AppConfig.kt (an older template) nothing is compared
+        await verifyGeneratedProject(dir, INPUT);
+        await fs.outputFile(path.join(dir, 'build-logic/src/main/kotlin/config/AppConfig.kt'), appConfig(0, 0, 1));
+        await assert.rejects(verifyGeneratedProject(dir, INPUT), /iOS MARKETING_VERSION \(1\.0\) must equal AppConfig\.versionName \(0\.0\.1\)/);
+        await fs.writeFile(xcconfig, (await fs.readFile(xcconfig, 'utf8')).replace('MARKETING_VERSION=1.0', 'MARKETING_VERSION=0.0.1'));
+        await verifyGeneratedProject(dir, INPUT);
+    });
+});
+
+test('the server image check is SKIP without Docker (backend)', async () => {
+    await withProject(async (dir) => {
+        assert.deepEqual(await checkServerImage(dir, { docker: path.join(dir, 'no-docker-here') }),
+            { status: 'SKIP', detail: 'Docker is not available' });
+    });
+});
+
+test('the server image check is opt-in: the option wins, then CMPOSE_SERVER_IMAGE_CHECK=1 (backend)', () => {
+    const stub = async () => ({ status: 'PASS' });
+    assert.equal(SERVER_IMAGE_ENV, 'CMPOSE_SERVER_IMAGE_CHECK');
+    assert.equal(resolveServerImageCheck(undefined, {}), null);
+    assert.equal(resolveServerImageCheck(undefined, { CMPOSE_SERVER_IMAGE_CHECK: '0' }), null);
+    assert.equal(resolveServerImageCheck(undefined, { CMPOSE_SERVER_IMAGE_CHECK: '1' }), checkServerImage);
+    assert.equal(resolveServerImageCheck(true, {}), checkServerImage);
+    assert.equal(resolveServerImageCheck(stub, {}), stub);
+    assert.equal(resolveServerImageCheck(stub, { CMPOSE_SERVER_IMAGE_CHECK: '1' }), stub);
+    assert.equal(resolveServerImageCheck(false, { CMPOSE_SERVER_IMAGE_CHECK: '1' }), null);
+});
+
+test('without the option or the env var the server image is SKIP, not requested, and docker is not called (backend)', async (t) => {
+    const logged = [];
+    setLogger({ info: (...a) => logged.push(a.join(' ')), warn() { }, error() { } });
+    t.after(() => setLogger(null));
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        const input = { ...INPUT, featuresConfig: { theming: false, multiLang: false, backend: true } };
+        // the seed has no Dockerfile: a real build would fail the verification
+        await verifyGeneratedProject(dir, input, { env: {} });
+        assert.ok(logged.includes('⏭️ server image: SKIP (not requested (set CMPOSE_SERVER_IMAGE_CHECK=1))'), logged.join('\n'));
+        // the env var asks for it: the option still wins
+        let called = 0;
+        const stub = async () => { called++; return { status: 'FAIL', detail: 'x' }; };
+        await assert.rejects(verifyGeneratedProject(dir, input, { serverImageCheck: stub, env: { CMPOSE_SERVER_IMAGE_CHECK: '1' } }), /server image/);
+        await verifyGeneratedProject(dir, input, { serverImageCheck: false, env: { CMPOSE_SERVER_IMAGE_CHECK: '1' } });
+        assert.equal(called, 1);
+    });
+});
+
+// A docker stand-in: logs its arguments and directory, answers info, build and image rm
+async function stubDocker(dir, { build }) {
+    const script = path.join(dir, 'docker-stub');
+    const log = path.join(dir, 'docker.log');
+    await fs.writeFile(script, [
+        '#!/bin/sh',
+        `echo "$PWD|$*" >> '${log}'`,
+        'case "$1" in',
+        '  info) echo 27.0.0 ;;',
+        `  build) ${build} ;;`,
+        '  image) echo deleted ;;',
+        'esac',
+        ''
+    ].join('\n'));
+    await fs.chmod(script, 0o755);
+    return { script, calls: async () => (await fs.readFile(log, 'utf8')).trim().split('\n') };
+}
+
+test('checkServerImage PASS: builds server/ from the project root, reads the image id and removes the image (backend)', async () => {
+    await withProject(async (dir) => {
+        const tools = await fs.mkdtemp(path.join(os.tmpdir(), 'cmp-docker-stub-'));
+        try {
+            const docker = await stubDocker(tools, { build: 'echo "#1 building" >&2; echo sha256:abc123' });
+            assert.deepEqual(await checkServerImage(dir, { docker: docker.script }), { status: 'PASS', detail: 'sha256:abc123' });
+            const calls = (await docker.calls()).map((line) => line.split('|'));
+            assert.deepEqual(calls.map(([, args]) => args),
+                ['info --format {{.ServerVersion}}', 'build --quiet -f server/deploy/Dockerfile server', 'image rm sha256:abc123']);
+            // the build runs from the project root
+            assert.equal(calls[1][0], await fs.realpath(dir));
+        } finally {
+            await fs.remove(tools);
+        }
+    });
+});
+
+test('checkServerImage FAIL: the last five stderr lines, joined with | (backend)', async () => {
+    await withProject(async (dir) => {
+        const tools = await fs.mkdtemp(path.join(os.tmpdir(), 'cmp-docker-stub-'));
+        try {
+            const docker = await stubDocker(tools, { build: 'for n in 1 2 3 4 5 6 7; do echo "line $n" >&2; done; exit 1' });
+            assert.deepEqual(await checkServerImage(dir, { docker: docker.script }),
+                { status: 'FAIL', detail: 'line 3 | line 4 | line 5 | line 6 | line 7' });
+            // no image to remove after a failed build
+            assert.equal((await docker.calls()).length, 2);
+        } finally {
+            await fs.remove(tools);
+        }
+    });
 });

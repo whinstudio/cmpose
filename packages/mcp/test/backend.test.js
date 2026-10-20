@@ -70,6 +70,45 @@ test('backend_generate without sharing drops the sharing part', async (t) => {
     assert.strictEqual(r.structuredContent.sharing, false);
 });
 
+test('backendGenerateForwardsSample', async (t) => {
+    const { outputDir, run } = await setup(t);
+    const off = await run({ sample: false });
+    assert.notStrictEqual(off.isError, true, textOf(off));
+    const dir = path.join(outputDir, 'NotesBackend');
+    assert.strictEqual(await exists(dir, 'src/main/kotlin/com/acme/notes/feature/sample'), false);
+    assert.strictEqual(await exists(dir, 'tools/sample-paths.txt'), false);
+    assert.strictEqual(JSON.parse(await read(dir, '.cmpose/generation.json')).sample, false);
+    assert.strictEqual(off.structuredContent.record.sample, false);
+
+    // through the MCP tool: the zod schema lets sample through, and validation refuses a non-boolean
+    const { client, close } = await connect({});
+    const bad = await client.callTool({ name: 'backend_generate', arguments: { ...BASE, projectName: 'NotesBad', outputDir, sample: 'no' } });
+    assert.strictEqual(bad.isError, true);
+    assert.match(textOf(bad), /sample/);
+    assert.strictEqual(await fs.pathExists(path.join(outputDir, 'NotesBad')), false);
+    await close();
+    const on = await run({ projectName: 'NotesBackendTwo', sample: true });
+    assert.notStrictEqual(on.isError, true, textOf(on));
+    assert.ok(await exists(path.join(outputDir, 'NotesBackendTwo'), 'src/main/kotlin/com/acme/notes/feature/sample/Items.kt'));
+    assert.strictEqual(on.structuredContent.record.sample, true);
+});
+
+test('backendGenerateReportsSample', async (t) => {
+    const { run } = await setup(t);
+    const newFeature = core.backend.describeBackend().conventions.newFeature;
+    for (const [args, flag, line] of [[{ sample: false }, false, 'Sample: off'], [{ projectName: 'NotesOn' }, true, 'Sample: on']]) {
+        const r = await run(args);
+        assert.notStrictEqual(r.isError, true, textOf(r));
+        assert.strictEqual(r.structuredContent.sample, flag);
+        const lines = textOf(r).split('\n');
+        assert.strictEqual(lines[lines.indexOf('Sharing: off') + 1], line);
+        // the add-a-feature step is the convention itself, right whether the sample is there or not
+        assert.ok(r.structuredContent.nextSteps.some((s) => s.includes(newFeature)));
+        for (const s of r.structuredContent.nextSteps) assert.doesNotMatch(s, /by copying feature\/sample/);
+        assert.doesNotMatch(textOf(r), /by copying feature\/sample/);
+    }
+});
+
 test('backend_generate refuses a non-empty target and changes nothing', async (t) => {
     const { outputDir, calls, run } = await setup(t);
     const target = path.join(outputDir, 'NotesBackend');
@@ -209,6 +248,10 @@ test('backend_describe returns the contract version, the pin and the conventions
     assert.strictEqual(facts.contractVersion, core.backend.backendContractVersion());
     assert.strictEqual(facts.templateRef, core.pins.backend.ref);
     assert.strictEqual(facts.options.sharing.default, false);
+    assert.deepStrictEqual(facts.options.sample, {
+        type: 'boolean', default: true, description: 'Include the sample items feature (feature/sample) as the shape to copy'
+    });
+    assert.match(facts.conventions.newFeature, /copying feature\/sample when present, otherwise the shape of files\//);
     assert.deepStrictEqual(facts.appNameRules.reserved, ['api', 'health', 'admin', 'static']);
     const conventions = JSON.stringify(facts.conventions);
     for (const rule of ['requireUser()', 'requireRole(', '404', 'feature/<name>/', 'feature/sample', 'ON DELETE CASCADE',
@@ -223,7 +266,8 @@ test('backend_generate offers exactly the contract fields', async () => {
     const { tools } = await client.listTools();
     const tool = tools.find((x) => x.name === 'backend_generate');
     assert.deepStrictEqual(Object.keys(tool.inputSchema.properties).sort(),
-        ['appName', 'outputDir', 'packageName', 'projectName', 'sharing', 'templateRef']);
+        ['appName', 'outputDir', 'packageName', 'projectName', 'sample', 'sharing', 'templateRef']);
+    assert.deepStrictEqual(tool.inputSchema.properties.sample, { type: 'boolean', description: 'Include the sample items feature (default true)' });
     assert.deepStrictEqual(tool.inputSchema.required.sort(), ['appName', 'outputDir', 'packageName', 'projectName']);
     assert.match(tool.description, /^Generate a standalone Kotlin\/Ktor backend \(Docker-ready\) on this machine\. Call backend_describe first\./);
     await close();

@@ -31,7 +31,7 @@ const SCHEMA = {
             'core/purchases': { requires: ['purchases'], note: 'offer / purchase / restore API, RevenueCat KMP (Test Store key: replace before you ship)' },
             'core/ads': { requires: ['ads'], note: 'AdMob banner/interstitial/rewarded + UMP/ATT consent (test IDs)' },
             'core/room': { requires: ['room'], note: 'Room KMP database (bundled SQLite): AppDatabase, DAOs, schemas/' },
-            'core/api': { requires: ['backend'], note: 'models and routes shared by the app and the server' },
+            'core/api': { requires: ['backend'], note: "the app's client models and routes for the backend API, checked by ApiContractTest" },
             'core/auth': { requires: ['backend'], note: 'Firebase sign-in (email, Google, Apple); the server client\'s token' }
         },
         // featuresConfig flag -> feature modules kept in a blank project (same requires/requiresAny rules).

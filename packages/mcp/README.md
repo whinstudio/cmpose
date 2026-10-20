@@ -101,7 +101,9 @@ as one Docker container behind nginx. `sharing` adds spaces, roles and invitatio
 - `cmp_generate`: creates the project. Required: `projectName` (letters only, up to 30),
   `appName` (up to 30 characters), `packageName` (e.g. `com.acme.habits`, up to 50 characters)
   and an absolute `outputDir`. Optional: `templateType`, `features` (module names up to 20),
-  `featuresConfig`, `minSdk` (24 to 36), `iosVersion` (15.0 to 26.2), `ci`, `templateRef`.
+  `featuresConfig`, `minSdk` (24 to 36), `iosVersion` (15.0 to 26.2), `ci`, `templateRef`,
+  `backendTemplateRef` (the backend template tag that `server/` comes from; blank with the
+  backend only).
   It returns the project path, the template version it used, warnings (e.g. test ad IDs to
   replace) and next steps.
 - `game_describe`: the Unity game generator's engine and editor version, template types,
@@ -123,9 +125,10 @@ as one Docker container behind nginx. `sharing` adds spaces, roles and invitatio
 - `backend_generate`: creates the backend. Required: `projectName` (letters only, up to 30),
   `appName` (the service name: 2 to 31 lowercase letters, digits or `-`, starting with a letter;
   not `api`, `health`, `admin` or `static`), `packageName` (e.g. `com.acme.notes`) and an
-  absolute `outputDir`. Optional: `sharing` (default `false`), `templateRef`. It never
-  overwrites a non-empty folder. `CMPOSE_BACKEND_TEMPLATE_DIR` (the absolute path of a backend
-  template checkout) generates from that checkout instead of the pinned tag.
+  absolute `outputDir`. Optional: `sharing` (default `false`), `sample` (the sample items
+  feature, default `true`), `templateRef`. It never overwrites a non-empty folder.
+  `CMPOSE_BACKEND_TEMPLATE_DIR` (the absolute path of a backend template checkout) generates
+  from that checkout instead of the pinned tag.
 
 ## How it works
 

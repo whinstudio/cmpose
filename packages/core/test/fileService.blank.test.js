@@ -286,6 +286,29 @@ test("blank drops the template's core tests but keeps shared's Koin graph check 
     });
 });
 
+// core/api is there only with the backend (applyBackendOption deletes it otherwise). Its Android-host contract
+// test checks the app's models and routes against the server/ next to it, so it stays; its commonTest (an iOS
+// test too, which Compass would count as the agent's) goes like every other template test.
+test("blank with the backend keeps core/api's Android-host contract test and drops its common tests", async (t) => {
+    t.mock.method(console, 'log', () => { });
+    await withTempDir(async (dir) => {
+        await seed(dir);
+        const contractTest = `core/api/src/androidHostTest/kotlin/${PKG}/core/api/ApiContractTest.kt`;
+        const models = `core/api/src/commonMain/kotlin/${PKG}/core/api/ApiModels.kt`;
+        await fs.outputFile(path.join(dir, 'core/api/build.gradle.kts'), 'plugins { }\n');
+        await fs.outputFile(path.join(dir, contractTest), `package ${NEW_PACKAGE}.core.api\n`);
+        await fs.outputFile(path.join(dir, `core/api/src/commonTest/kotlin/${PKG}/core/api/ApiModelsTest.kt`), `package ${NEW_PACKAGE}.core.api\n`);
+        await fs.outputFile(path.join(dir, models), `package ${NEW_PACKAGE}.core.api\n`);
+
+        await processBlankApp(dir, NEW_PACKAGE, [], config({ backend: true }));
+
+        assert.ok(await exists(dir, contractTest), 'ApiContractTest stays');
+        assert.equal(await exists(dir, 'core/api/src/commonTest'), false, 'core/api commonTest goes');
+        assert.ok(await exists(dir, models));
+        assert.equal(await exists(dir, 'core/database/src/commonTest'), false, 'the other core tests still go');
+    });
+});
+
 test('Network off: FeatureDataConventionPlugin loses exactly core:network and ktor-client-core', async (t) => {
     t.mock.method(console, 'log', () => { });
     t.mock.method(console, 'warn', () => { });

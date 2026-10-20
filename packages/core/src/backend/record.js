@@ -16,6 +16,7 @@ function buildBackendRecord(value, { templateRef = null, templateCommit = null, 
         kind: 'backend',
         contractVersion: backendContractVersion(),
         sharing: value.sharing === true,
+        sample: value.sample !== false,
         template: { repo: pins.backend.repo, ref: templateRef || null, commit: templateCommit || null },
         generatedAt: now.toISOString()
     };

@@ -10,6 +10,10 @@ test('backendContractVersion is 12 hex chars and stable', () => {
     assert.strictEqual(backendContractVersion(), hashContract(BACKEND_SCHEMA));
 });
 
+test('backendContractVersion is the published value (the sample option changed it)', () => {
+    assert.strictEqual(backendContractVersion(), 'c27b8f701820');
+});
+
 test('backendContractVersion changes with the schema', () => {
     const changed = { ...BACKEND_SCHEMA, anatomy: { ...BACKEND_SCHEMA.anatomy, localPort: BACKEND_SCHEMA.anatomy.localPort + 1 } };
     assert.notStrictEqual(hashContract(changed), backendContractVersion());
@@ -26,7 +30,7 @@ test('BACKEND_SCHEMA names the template identity and is frozen', () => {
     });
     assert.deepStrictEqual({ ...BACKEND_SCHEMA, appName: undefined }, {
         appName: undefined,
-        options: { sharing: { type: 'boolean', default: false } },
+        options: { sharing: { type: 'boolean', default: false }, sample: { type: 'boolean', default: true } },
         identity: { package: 'io.cmpose.backendtemplate', appName: 'cmpose-app', projectName: 'Cmpose Backend' },
         anatomy: { localTask: 'runLocal', localPort: 18001, deployDir: 'deploy' }
     });

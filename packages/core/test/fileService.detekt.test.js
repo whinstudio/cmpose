@@ -152,45 +152,37 @@ test('removeCiDetektStep also removes the step from a CRLF ci.yml', () => {
     assert.equal(removeCiDetektStep(crlf), '      - name: build\r\n        run: ./gradlew build\r\n      - name: tests\r\n');
 });
 
-test('processBlankApp with detekt off drops the plugin id core/api and the server apply; with detekt on keeps it', async (t) => {
+test('processBlankApp with detekt off drops the plugin id from core/api; with detekt on keeps it', async (t) => {
     t.mock.method(console, 'log', () => { });
 
     for (const detekt of [false, true]) {
         await withTempDir(async (dir) => {
             await setupDetektFixture(dir, NEW_PACKAGE);
             const plugins = `plugins {\n    id("${NEW_PACKAGE}.detekt")\n    alias(libs.plugins.kotlinMultiplatform)\n}\n`;
-            const builds = ['core/api/build.gradle.kts', 'server/build.gradle.kts'].map((rel) => path.join(dir, rel));
-            for (const file of builds) await fs.outputFile(file, plugins);
+            const build = path.join(dir, 'core/api/build.gradle.kts');
+            await fs.outputFile(build, plugins);
 
             await processBlankApp(dir, NEW_PACKAGE, [], detektConfig({ detekt, backend: true, network: true, multiLang: true, dataStore: true }));
 
-            for (const file of builds) {
-                const out = await fs.readFile(file, 'utf8');
-                assert.equal(out.includes(`id("${NEW_PACKAGE}.detekt")`), detekt, out);
-                assert.ok(out.includes('alias(libs.plugins.kotlinMultiplatform)'));
-            }
+            const out = await fs.readFile(build, 'utf8');
+            assert.equal(out.includes(`id("${NEW_PACKAGE}.detekt")`), detekt, out);
+            assert.ok(out.includes('alias(libs.plugins.kotlinMultiplatform)'));
         });
     }
 });
 
-test('processBlankApp with detekt off also drops the server\'s detekt { } source line and its comment', async (t) => {
+test('processBlankApp with detekt off leaves server/build.gradle.kts alone (the backend template keeps its own detekt)', async (t) => {
     t.mock.method(console, 'log', () => { });
 
-    for (const detekt of [false, true]) {
-        await withTempDir(async (dir) => {
-            await setupDetektFixture(dir, NEW_PACKAGE);
-            const server = path.join(dir, 'server', 'build.gradle.kts');
-            await fs.outputFile(server, `plugins {\n    id("${NEW_PACKAGE}.detekt")\n    application\n}\n\n` +
-                'dependencies {\n    implementation(libs.ktor.server.core)\n}\n\n' +
-                '// The convention plugin only lists src/main; the local runner gets the same rules.\n' +
-                'detekt { source.from("src/local/kotlin") }\n\nsourceSets.test {\n}\n');
+    await withTempDir(async (dir) => {
+        await setupDetektFixture(dir, NEW_PACKAGE);
+        const server = path.join(dir, 'server', 'build.gradle.kts');
+        const content = 'plugins {\n    alias(libs.plugins.detekt)\n    application\n}\n\n'
+            + 'detekt {\n    source.setFrom(files("src/main/kotlin", "src/local/kotlin"))\n}\n';
+        await fs.outputFile(server, content);
 
-            await processBlankApp(dir, NEW_PACKAGE, [], detektConfig({ detekt, backend: true, network: true, multiLang: true, dataStore: true }));
+        await processBlankApp(dir, NEW_PACKAGE, [], detektConfig({ detekt: false, backend: true, network: true, multiLang: true, dataStore: true }));
 
-            const out = await fs.readFile(server, 'utf8');
-            assert.equal(out.includes('detekt { source.from("src/local/kotlin") }'), detekt, out);
-            assert.equal(out.includes('the local runner gets the same rules'), detekt, out);
-            if (!detekt) assert.ok(out.includes('}\n\nsourceSets.test {'), out);
-        });
-    }
+        assert.equal(await fs.readFile(server, 'utf8'), content);
+    });
 });

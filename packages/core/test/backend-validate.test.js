@@ -8,10 +8,27 @@ const OUT = path.resolve('/', 'tmp', 'out');
 const valid = (over = {}) => ({ projectName: 'Notes', appName: 'notes-app', packageName: 'com.example.notes', outputDir: OUT, ...over });
 const fieldsOf = (r) => r.errors.map((e) => e.field);
 
-test('a valid input passes with sharing off by default', () => {
+test('a valid input passes with sharing off and sample on by default', () => {
     const r = validateBackend(valid());
     assert.strictEqual(r.ok, true, JSON.stringify(r.errors));
-    assert.deepStrictEqual(r.value, { projectName: 'Notes', appName: 'notes-app', packageName: 'com.example.notes', outputDir: OUT, sharing: false });
+    assert.deepStrictEqual(r.value, {
+        projectName: 'Notes', appName: 'notes-app', packageName: 'com.example.notes', outputDir: OUT, sharing: false, sample: true
+    });
+});
+
+test('sampleDefaultsToTrue', () => {
+    assert.strictEqual(validateBackend(valid()).value.sample, true);
+    assert.strictEqual(validateBackend(valid({ sample: undefined })).value.sample, true);
+    assert.strictEqual(validateBackend(valid({ sample: false })).value.sample, false);
+    assert.strictEqual(validateBackend(valid({ sample: true })).value.sample, true);
+});
+
+test('sampleMustBeBoolean', () => {
+    for (const sample of ['no', 'false', 0, null]) {
+        const r = validateBackend(valid({ sample }));
+        assert.strictEqual(r.ok, false, String(sample));
+        assert.deepStrictEqual(r.errors, [{ field: 'sample', message: 'sample must be true or false' }]);
+    }
 });
 
 test('sharing and templateRef pass through when valid', () => {
@@ -123,8 +140,10 @@ test('a bad templateRef is rejected', () => {
 });
 
 test('every problem is reported, and a non-object input is one error', () => {
-    const r = validateBackend({ projectName: 'Notes', appName: 'api', packageName: 'x', outputDir: 'rel', sharing: 'yes', templateRef: '../x' });
-    assert.deepStrictEqual(fieldsOf(r).sort(), ['appName', 'outputDir', 'packageName', 'sharing', 'templateRef']);
+    const r = validateBackend({
+        projectName: 'Notes', appName: 'api', packageName: 'x', outputDir: 'rel', sharing: 'yes', sample: 1, templateRef: '../x'
+    });
+    assert.deepStrictEqual(fieldsOf(r).sort(), ['appName', 'outputDir', 'packageName', 'sample', 'sharing', 'templateRef']);
     for (const input of [null, 'x', []]) {
         const bad = validateBackend(input);
         assert.strictEqual(bad.ok, false);
@@ -135,5 +154,5 @@ test('every problem is reported, and a non-object input is one error', () => {
 test('only the known fields reach the value', () => {
     const r = validateBackend(valid({ admin: true, __proto__: { polluted: true } }));
     assert.strictEqual(r.ok, true);
-    assert.deepStrictEqual(Object.keys(r.value).sort(), ['appName', 'outputDir', 'packageName', 'projectName', 'sharing']);
+    assert.deepStrictEqual(Object.keys(r.value).sort(), ['appName', 'outputDir', 'packageName', 'projectName', 'sample', 'sharing']);
 });

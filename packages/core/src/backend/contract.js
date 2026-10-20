@@ -26,7 +26,10 @@ const BACKEND_SCHEMA = Object.freeze({
             'user', 'using', 'variadic', 'verbose', 'when', 'where', 'window', 'with'
         ])
     }),
-    options: Object.freeze({ sharing: Object.freeze({ type: 'boolean', default: false }) }),
+    options: Object.freeze({
+        sharing: Object.freeze({ type: 'boolean', default: false }),
+        sample: Object.freeze({ type: 'boolean', default: true })
+    }),
     // The template's own names, which the generator renames
     identity: Object.freeze({ package: 'io.cmpose.backendtemplate', appName: 'cmpose-app', projectName: 'Cmpose Backend' }),
     anatomy: Object.freeze({ localTask: 'runLocal', localPort: 18001, deployDir: 'deploy' })

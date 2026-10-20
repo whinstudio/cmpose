@@ -3139,7 +3139,8 @@ class FavoritesRepositoryImpl(@Provided private val favoriteUserDao: FavoriteUse
                         <li><code>server/</code>: the Ktor server. It checks the Firebase ID token of every request
                             and stores spaces, members, invites and files; it has its own tests
                             (<code>./gradlew :server:test</code>).</li>
-                        <li><code>core/api</code>: the models and routes the app and the server share.</li>
+                        <li><code>core/api</code>: the app's client models and routes for the backend API,
+                            checked against the server's API description by <code>ApiContractTest</code>.</li>
                         <li><code>core/auth</code>: Firebase sign-in (email, Google, Apple) and the token the
                             server client sends.</li>
                         <li><code>feature/account</code>: the sign-in screens and the account screen, account

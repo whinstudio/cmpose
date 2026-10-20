@@ -193,3 +193,178 @@ test('the download progress message is sent only while the template is not cache
     assert.ok(!second.some((m) => /Downloading/.test(m)), second.join(' | '));
     await cleanup();
 });
+
+// --- blank with backend: server/ comes from the backend template (core places it; here the call is captured) ---
+
+const { execFileSync } = require('child_process');
+const { fixtureCopy } = require('../../core/test/backend-helpers');
+
+const BACKEND_COMMIT = 'b'.repeat(40);
+const MISSING_BACKEND_REF = 'backend-template-missing';
+const BACKEND_ON = { templateType: 'blank', featuresConfig: { backend: true } };
+const RAW_COPY_RE = /^\.cmpose-[0-9a-f]{12}-server$/;
+
+// Relative paths of every file under dir
+async function filesUnder(dir) {
+    const entries = await fs.promises.readdir(dir, { recursive: true, withFileTypes: true });
+    return entries.filter((e) => e.isFile()).map((e) => path.relative(dir, path.join(e.parentPath || e.path, e.name)).split(path.sep).join('/')).sort();
+}
+
+// Two remote repos behind one injected cacheEnsure: the CMP seed through the real cache, the backend fixture stubbed.
+// core.generateCmpProject is captured when it gets a backendTemplate (the seed has no backend modules to generate).
+// failGeneration: the captured generation throws, as a failing server/ placement would
+async function backendSetup(t, { failGeneration = false } = {}) {
+    const base = await setup();
+    t.after(base.cleanup);
+    const template = await fixtureCopy(t);
+    const calls = [];
+    const cacheEnsure = async (req) => {
+        calls.push(req);
+        if (req.repo === core.pins.backend.repo) {
+            if (req.ref === MISSING_BACKEND_REF) throw new core.TemplateFetchError(`template ${req.ref} not found`);
+            return { dir: template, ref: req.ref, commit: BACKEND_COMMIT };
+        }
+        return core.templateCache.ensure(req);
+    };
+    const seen = [];
+    const original = core.generateCmpProject;
+    core.generateCmpProject = async (value, opts) => {
+        if (!opts.backendTemplate) return original(value, opts);
+        seen.push({ opts, files: await filesUnder(opts.backendTemplate.dir) });
+        if (failGeneration) throw new Error('server placement failed');
+        return { warnings: [], templateType: value.templateType, features: value.features };
+    };
+    t.after(() => { core.generateCmpProject = original; });
+    const progress = [];
+    const run = (extra, opts = {}) => runGenerate(args(base.outputDir, extra),
+        { ...base.opts, cacheEnsure, onProgress: (m) => progress.push(m), ...opts });
+    const backendCalls = () => calls.filter((c) => c.repo === core.pins.backend.repo).map((c) => c.ref);
+    return { ...base, template, calls, backendCalls, seen, progress, run };
+}
+
+test('backendOnFetchesThePinnedBackendTemplate', async (t) => {
+    const { outputDir, backendCalls, seen, progress, run } = await backendSetup(t);
+    const r = await run(BACKEND_ON);
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    assert.deepStrictEqual(backendCalls(), [core.pins.backend.ref]);
+    assert.strictEqual(seen.length, 1);
+    const { backendTemplate, projectDir } = seen[0].opts;
+    assert.deepStrictEqual(Object.keys(backendTemplate).sort(), ['commit', 'dir', 'ref', 'repo']);
+    assert.strictEqual(path.dirname(backendTemplate.dir), outputDir);
+    assert.match(path.basename(backendTemplate.dir), RAW_COPY_RE);
+    assert.strictEqual(backendTemplate.dir, `${projectDir}-server`);
+    assert.deepStrictEqual({ ...backendTemplate, dir: undefined },
+        { dir: undefined, repo: core.pins.backend.repo, ref: core.pins.backend.ref, commit: BACKEND_COMMIT });
+    assert.ok(seen[0].files.includes('src/main/kotlin/io/cmpose/backendtemplate/Main.kt'), seen[0].files.join(', '));
+    assert.deepStrictEqual(r.structuredContent.backendTemplate,
+        { repo: core.pins.backend.repo, ref: core.pins.backend.ref, commit: BACKEND_COMMIT });
+    assert.ok(r.content[0].text.split('\n').includes(`Server template: ${core.pins.backend.repo}@${core.pins.backend.ref} (bbbbbbb)`),
+        r.content[0].text);
+    assert.ok(await fs.pathExists(path.join(outputDir, 'Demo')));
+    assert.deepStrictEqual(await leftovers(outputDir), []);
+    assert.strictEqual(progress.length, 3, progress.join(' | '));
+    assert.deepStrictEqual(progress, ['Downloading the server template (first run only)', 'Downloading the template (first run only)', 'Generating the project']);
+});
+
+test('backendTemplateRefOverridesThePin', async (t) => {
+    const { backendCalls, seen, run } = await backendSetup(t);
+    const r = await run({ ...BACKEND_ON, backendTemplateRef: 'backend-template-2026.01.01' });
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    assert.deepStrictEqual(backendCalls(), ['backend-template-2026.01.01']);
+    assert.strictEqual(seen[0].opts.backendTemplate.ref, 'backend-template-2026.01.01');
+    assert.strictEqual(r.structuredContent.backendTemplate.ref, 'backend-template-2026.01.01');
+    // the CMP template keeps its own pin
+    assert.strictEqual(r.structuredContent.template.ref, core.pins.cmp.ref);
+});
+
+test('backendFetchFailureWritesNothing', async (t) => {
+    const { outputDir, seen, run } = await backendSetup(t);
+    const r = await run({ ...BACKEND_ON, backendTemplateRef: MISSING_BACKEND_REF });
+    assert.strictEqual(r.isError, true);
+    assert.match(r.content[0].text, new RegExp(MISSING_BACKEND_REF));
+    assert.strictEqual(await fs.pathExists(path.join(outputDir, 'Demo')), false);
+    assert.deepStrictEqual(await leftovers(outputDir), []);
+    assert.deepStrictEqual(await fs.readdir(outputDir), []);
+    assert.deepStrictEqual(seen, []);
+});
+
+test('pendingBackendPinIsRefused', async (t) => {
+    const { outputDir, calls, seen, run } = await backendSetup(t);
+    const r = await run({ ...BACKEND_ON, backendTemplateRef: 'backend-template-PENDING' });
+    assert.strictEqual(r.isError, true);
+    // cmp_generate names its own field; backend_generate's hint (templateRef) is unchanged
+    assert.strictEqual(r.content[0].text, 'The backend template is not released yet; pass backendTemplateRef or set CMPOSE_BACKEND_TEMPLATE_DIR.');
+    assert.deepStrictEqual(calls, []);
+    assert.deepStrictEqual(seen, []);
+    assert.deepStrictEqual(await fs.readdir(outputDir), []);
+});
+
+test('backendRawCopyIsRemovedWhenGenerationFails', async (t) => {
+    const { outputDir, seen, run } = await backendSetup(t, { failGeneration: true });
+    const r = await run(BACKEND_ON);
+    assert.strictEqual(r.isError, true);
+    assert.strictEqual(r.content[0].text, 'Generation failed: server placement failed');
+    // the raw copy existed while core ran, and neither it nor the work dir nor a half project is left
+    assert.ok(seen[0].files.includes('src/main/kotlin/io/cmpose/backendtemplate/Main.kt'));
+    assert.deepStrictEqual(await leftovers(outputDir), []);
+    assert.strictEqual(await fs.pathExists(path.join(outputDir, 'Demo')), false);
+    assert.deepStrictEqual(await fs.readdir(outputDir), []);
+});
+
+test('localBackendTemplateDirIsUsedAndWarned', async (t) => {
+    const { template, outputDir, backendCalls, seen, run } = await backendSetup(t);
+    const git = (...a) => execFileSync('git', ['-C', template, '-c', 'user.name=test', '-c', 'user.email=test@example.invalid',
+        '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...a], { stdio: 'pipe' });
+    git('init', '-q');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'template');
+    await fs.appendFile(path.join(template, 'README.md'), '\nA local edit.\n');
+    await fs.outputFile(path.join(template, '.env'), 'SECRET=1\n');
+    const r = await run(BACKEND_ON, { backendTemplateDir: template });
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    assert.deepStrictEqual(backendCalls(), []);
+    const { files } = seen[0];
+    assert.ok(files.includes('README.md'));
+    assert.ok(!files.includes('.env'), 'untracked secret not copied');
+    assert.ok(!files.some((f) => f.startsWith('.git/')), 'no .git');
+    assert.deepStrictEqual(r.structuredContent.backendTemplate, { repo: core.pins.backend.repo, ref: 'local', commit: null });
+    const warnings = r.structuredContent.warnings;
+    assert.ok(warnings.some((w) => /local backend template checkout \(CMPOSE_BACKEND_TEMPLATE_DIR\), not a released tag/.test(w)), warnings.join(' | '));
+    assert.ok(warnings.includes('The local template checkout has uncommitted changes; the project holds them.'), warnings.join(' | '));
+    assert.ok(r.content[0].text.split('\n').includes(`Server template: ${core.pins.backend.repo}@local`), r.content[0].text);
+    assert.deepStrictEqual(await leftovers(outputDir), []);
+});
+
+test('backendOffDoesNotFetchTheBackendTemplate', async (t) => {
+    const { calls, backendCalls, seen, progress, run } = await backendSetup(t);
+    const r = await run({ templateType: 'blank', featuresConfig: { backend: false } });
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    assert.deepStrictEqual(backendCalls(), []);
+    assert.deepStrictEqual(calls.map((c) => c.repo), [core.pins.cmp.repo]);
+    assert.deepStrictEqual(seen, []);
+    assert.strictEqual(r.structuredContent.backendTemplate, undefined);
+    assert.doesNotMatch(r.content[0].text, /Server template:/);
+    assert.strictEqual(progress.length, 2, progress.join(' | '));
+});
+
+test('backendTemplateRefWithBackendOffIsIgnoredWithAWarning', async (t) => {
+    const { backendCalls, run } = await backendSetup(t);
+    for (const [projectName, extra] of [['Blank', { templateType: 'blank' }], ['Showcase', {}]]) {
+        const r = await run({ ...extra, projectName, backendTemplateRef: 'backend-template-2026.01.01' });
+        assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+        assert.ok(r.structuredContent.warnings.includes('backendTemplateRef ignored: featuresConfig.backend is off'),
+            r.structuredContent.warnings.join(' | '));
+        assert.match(r.content[0].text, /Warning: backendTemplateRef ignored: featuresConfig\.backend is off/);
+        assert.strictEqual(r.structuredContent.backendTemplate, undefined);
+    }
+    assert.deepStrictEqual(backendCalls(), []);
+});
+
+test('invalidBackendTemplateRefIsRefused', async (t) => {
+    const { outputDir, calls, run } = await backendSetup(t);
+    const r = await run({ ...BACKEND_ON, backendTemplateRef: '../x' });
+    assert.strictEqual(r.isError, true);
+    assert.match(r.content[0].text, /backendTemplateRef must be a tag or branch name/);
+    assert.deepStrictEqual(calls, []);
+    assert.deepStrictEqual(await fs.readdir(outputDir), []);
+});

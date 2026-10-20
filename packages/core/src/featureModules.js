@@ -34,6 +34,10 @@ const BLANK_ONLY_FEATURES = ['notes'];
 const NOTES_INCLUDE_REGEX = /^\s*include\("?:?feature:notes(?::(?:contract|presentation))?"\)\s*$/;
 // Cloned modules carry no test sources (Compass counts the iOS tests of a project as the agent's)
 const TEST_SOURCE_SET_REGEX = /(^|\/)src\/[^/]*Test\//;
+// The template test source sets a blank project keeps: Android-host checks only, never an iOS test. shared's Koin
+// graph check, and core/api's contract test (ApiContractTest: the app's models and routes against server/; core/api
+// is there only with the backend)
+const BLANK_KEPT_TEST_DIRS = ['shared/src/androidHostTest/', 'core/api/src/androidHostTest/'];
 
 function capitalize(name) {
     return name.charAt(0).toUpperCase() + name.slice(1);
@@ -159,8 +163,8 @@ const MONETIZATION_CAPABILITIES = [
     { dir: `${BLANK_OVERLAY_DIR}/${LAYERS_DIR}/${MONETIZATION_LAYER.name}`, needed: MONETIZATION_LAYER.applies }
 ];
 // Checked per request only: a readiness check (no config) does not need them, so a template pinned
-// before the backend release still serves every other option
-const BACKEND_CAPABILITIES = ['server', 'core/api', 'core/auth', 'feature/account', 'feature/sharing']
+// before the backend release still serves every other option (server/ comes from the backend template)
+const BACKEND_CAPABILITIES = ['core/api', 'core/auth', 'feature/account', 'feature/sharing']
     .map((dir) => ({ dir, needed: (cfg) => cfg.backend === true }));
 
 class TemplateCapabilityError extends Error {
@@ -242,6 +246,6 @@ async function cloneFeatureModules(projectPath, features) {
 }
 
 module.exports = {
-    applyBlankShell, cloneFeatureModules, wrapLongSingleParamSignatures, capitalize, TEST_SOURCE_SET_REGEX,
+    applyBlankShell, cloneFeatureModules, wrapLongSingleParamSignatures, capitalize, TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS,
     assertTemplateCapabilities, missingTemplateCapabilities, templateLacksMessage, TemplateCapabilityError
 };

@@ -34,6 +34,9 @@ module.exports = {
     minSdkAboveTarget: require('./validate').minSdkAboveTarget,
     generationWarnings: require('./warnings').generationWarnings,
     generateCmpProject: require('./generate').generateCmpProject,
+    // server/ from the backend template (also the template maintainers' fetch-server script)
+    placeServer: require('./serverFromBackend').placeServer,
+    deriveServerAppName: require('./serverFromBackend').deriveServerAppName,
     templateCache: require('./templateCache'),
     game: require('./game'),
     backend: require('./backend'),
