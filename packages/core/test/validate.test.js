@@ -42,6 +42,19 @@ test('blank normalizes featuresConfig and checks the base URL', () => {
     assert.deepStrictEqual(bad, { ok: false, error: PV.messages.urlInvalid });
 });
 
+test('longPackageWithBackendIsRefused', () => {
+    // 45 characters: fine for the app, 52 with .server
+    const packageName = `com.example.${'a'.repeat(33)}`;
+    assert.strictEqual(packageName.length, 45);
+    assert.strictEqual(validate({ ...base, packageName, templateType: 'blank', featuresConfig: { backend: false } }).ok, true);
+    assert.strictEqual(validate({ ...base, packageName, templateType: 'showcase' }).ok, true);
+    assert.deepStrictEqual(validate({ ...base, packageName, templateType: 'blank', featuresConfig: { backend: true } }),
+        { ok: false, error: `packageName is too long for the server package (${packageName}.server)` });
+    // 43 + .server = 50: the limit itself is allowed
+    const atLimit = `com.example.${'a'.repeat(31)}`;
+    assert.strictEqual(validate({ ...base, packageName: atLimit, templateType: 'blank', featuresConfig: { backend: true } }).ok, true);
+});
+
 test('minSdk above the template target is rejected', () => {
     assert.match(validate({ ...base, minSdk: '36' }, { templateTargetSdk: '35' }).error, /target SDK \(35\)/);
     assert.strictEqual(minSdkAboveTarget('24', null), null);

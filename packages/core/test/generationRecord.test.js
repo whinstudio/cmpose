@@ -44,6 +44,7 @@ test('the generation record names the template, the backend and the options, wit
         generatedAt: '2026-09-29T11:00:00.000Z',
         template: { ref: 'refs/tags/template-2026.09.29.2', commit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
         backend: { revision: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+        serverTemplate: null,
         options: {
             templateType: 'blank',
             ci: true,
@@ -53,6 +54,12 @@ test('the generation record names the template, the backend and the options, wit
             featuresConfig: { network: true, customDetektYaml: true }
         }
     });
+});
+
+test('the generation record names the backend template server/ came from', () => {
+    const serverTemplate = { repo: 'https://example.invalid/backend.git', ref: 'backend-template-2026.10.20', commit: 'c'.repeat(40) };
+    const record = buildGenerationRecord({ templateType: 'blank', minSdk: '24', iosVersion: '15.0', features: [], featuresConfig: { backend: true }, serverTemplate });
+    assert.deepEqual(record.serverTemplate, serverTemplate);
 });
 
 test('ci-optin: the generation record says ci false when the option was not sent', () => {

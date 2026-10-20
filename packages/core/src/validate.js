@@ -60,6 +60,13 @@ function validate(input, { limits = LIMITS, templateTargetSdk = null } = {}) {
             !PV.validateUrl(normalizedFeaturesConfig.networkBaseUrl)) {
             return fail(PV.messages.urlInvalid);
         }
+        // The backend's server package is the app's plus .server (server/ from the backend template)
+        if (normalizedFeaturesConfig.backend === true) {
+            const serverPackage = `${packageName}.server`;
+            if (!PV.validatePackageName(serverPackage) || !PV.validateMaxLength(serverPackage, PV.MAX_LENGTH_PACKAGE_NAME)) {
+                return fail(`packageName is too long for the server package (${serverPackage})`);
+            }
+        }
     }
 
     return {

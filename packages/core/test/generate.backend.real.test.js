@@ -9,13 +9,20 @@ const { generateCmpProject } = require('../src/generate');
 const { listTextFiles } = require('../src/projectFiles');
 const { BACKEND_RESIDUE_TOKENS } = require('../src/fileService');
 
-// The whole pipeline against the REAL template with the backend (CMP_REAL_TEMPLATE_DIR, e.g. a `git archive` of
-// the template's backend branch). Skipped, not failed, when it is unset or the template predates the backend.
+// The whole pipeline against the REAL templates (CMP_REAL_TEMPLATE_DIR, e.g. a `git archive` of the CMP template's
+// branch; CMPOSE_BACKEND_TEMPLATE_DIR, a backend template checkout, which server/ comes from). Skipped, not failed,
+// when either is unset or the CMP template predates the backend.
 const REAL = process.env.CMP_REAL_TEMPLATE_DIR;
-const HAS_TEMPLATE = Boolean(REAL) && fs.existsSync(path.join(REAL, 'server', 'build.gradle.kts'))
+const BACKEND = process.env.CMPOSE_BACKEND_TEMPLATE_DIR;
+const HAS_TEMPLATE = Boolean(REAL) && Boolean(BACKEND) && fs.existsSync(path.join(BACKEND, 'settings.gradle.kts'))
     && fs.existsSync(path.join(REAL, 'blank', 'layers')) && fs.existsSync(path.join(REAL, 'feature', 'sample'));
-const NO_TEMPLATE = { skip: REAL ? `no backend template at CMP_REAL_TEMPLATE_DIR (${REAL})` : 'CMP_REAL_TEMPLATE_DIR is not set' };
+const NO_TEMPLATE = {
+    skip: !REAL ? 'CMP_REAL_TEMPLATE_DIR is not set'
+        : !BACKEND ? 'CMPOSE_BACKEND_TEMPLATE_DIR is not set' : `no backend-ready templates at CMP_REAL_TEMPLATE_DIR (${REAL}) and CMPOSE_BACKEND_TEMPLATE_DIR (${BACKEND})`
+};
 const OPTIONS = HAS_TEMPLATE ? {} : NO_TEMPLATE;
+// A checkout's own state and build output never reach the copy
+const BACKEND_SKIPPED = new Set(['.git', '.gradle', '.kotlin', 'build', '.local-server', '.idea', '.claude']);
 
 // What the template's sync (updateTemplate) keeps out of the template: an upstream archive still has them
 const MAINTAINER_ONLY = ['gradle/wizard.gradle.kts', 'MAINTAINING.md', 'scripts/ios-add-packages.rb', 'scripts-maintainer'];
@@ -34,7 +41,14 @@ async function generate(t, request) {
     });
     const { ok, value, error } = validate({ appName: 'Demo App', minSdk: '24', iosVersion: '16.0', ...request });
     assert.ok(ok, error);
-    await generateCmpProject(value, { projectDir, generatorVersion: 'test' });
+    let backendTemplate = null;
+    if (value.templateType === 'blank' && value.featuresConfig.backend === true) {
+        const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-backend-template-'));
+        t.after(() => fs.remove(dir));
+        await fs.copy(BACKEND, dir, { filter: (src) => !BACKEND_SKIPPED.has(path.basename(src)) });
+        backendTemplate = { dir, repo: 'local', ref: 'local', commit: null };
+    }
+    await generateCmpProject(value, { projectDir, generatorVersion: 'test', backendTemplate });
     return projectDir;
 }
 
@@ -99,7 +113,8 @@ test('real template, blank with the backend and a custom module: server, modules
     assert.ok(plist.includes('<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>'));
 
     const settings = await read(projectDir, 'settings.gradle.kts');
-    for (const include of [':server', ':core:api', ':core:auth', ':feature:account:presentation', ':feature:sharing:presentation',
+    assert.match(settings, /^(?![ \t]*\/\/).*\bincludeBuild\("server"\)/m, 'includeBuild("server") missing');
+    for (const include of [':core:api', ':core:auth', ':feature:account:presentation', ':feature:sharing:presentation',
         ':feature:notesx:presentation']) {
         assert.ok(settings.includes(`"${include}"`), `${include} not included`);
     }
@@ -111,12 +126,19 @@ test('real template, blank with the backend and a custom module: server, modules
         assert.match(initKoin, new RegExp(`\\b${module}\\b`), module);
     }
 
-    // detekt is off: the server and core/api no longer apply its plugin
-    for (const rel of ['server/build.gradle.kts', 'core/api/build.gradle.kts']) {
-        assert.ok(!(await read(projectDir, rel)).includes('.detekt")'), rel);
+    // server/ is the backend template's (sharing on, sample off, the package <app>.server), its CI and record gone
+    assert.match(await read(projectDir, 'server/gradle.properties'), /^localServerDir=\.\.\/\.local-server$/m);
+    for (const gone of ['server/.github', 'server/.cmpose', 'server/src/main/kotlin/com/example/cloudlist/server/feature/sample']) {
+        assert.equal(await fs.pathExists(path.join(projectDir, gone)), false, gone);
     }
-    // ... and nothing configures it there either (the server's build script would not compile)
-    assert.ok(!/^\s*detekt\s*\{/m.test(await read(projectDir, 'server/build.gradle.kts')), 'server/build.gradle.kts configures detekt');
+    for (const file of await listTextFiles(path.join(projectDir, 'server'))) {
+        const rel = path.relative(projectDir, file).split(path.sep).join('/');
+        assert.ok(!rel.includes('feature/sample'), rel);
+        assert.ok(!(await fs.readFile(file, 'utf8')).includes('io.cmpose.backendtemplate'), rel);
+    }
+
+    // detekt is off: core/api no longer applies its plugin (server/ keeps the backend template's own detekt)
+    assert.ok(!(await read(projectDir, 'core/api/build.gradle.kts')).includes('.detekt")'), 'core/api/build.gradle.kts');
 
     // ads is off: Package.resolved keeps the backend's pins and loses only GMA and UMP
     const pins = JSON.parse(await read(projectDir, PACKAGE_RESOLVED)).pins.map((pin) => pin.identity);
@@ -124,7 +146,7 @@ test('real template, blank with the backend and a custom module: server, modules
     for (const gone of GMA_PINS) assert.ok(!pins.includes(gone), gone);
 
     const readme = await read(projectDir, 'README.md');
-    assert.ok(readme.includes('- `:server`'), 'README does not list :server');
+    assert.ok(readme.includes('- `server/`: Ktor server from the cmpose backend template'), 'README does not list server/');
     assert.ok(readme.includes('- `:feature:notesx`'), 'README does not list the custom module');
 
     for (const file of await listTextFiles(projectDir)) {

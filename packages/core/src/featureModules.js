@@ -159,8 +159,8 @@ const MONETIZATION_CAPABILITIES = [
     { dir: `${BLANK_OVERLAY_DIR}/${LAYERS_DIR}/${MONETIZATION_LAYER.name}`, needed: MONETIZATION_LAYER.applies }
 ];
 // Checked per request only: a readiness check (no config) does not need them, so a template pinned
-// before the backend release still serves every other option
-const BACKEND_CAPABILITIES = ['server', 'core/api', 'core/auth', 'feature/account', 'feature/sharing']
+// before the backend release still serves every other option (server/ comes from the backend template)
+const BACKEND_CAPABILITIES = ['core/api', 'core/auth', 'feature/account', 'feature/sharing']
     .map((dir) => ({ dir, needed: (cfg) => cfg.backend === true }));
 
 class TemplateCapabilityError extends Error {

@@ -16,12 +16,20 @@ const { fillReadme } = require('./readmeService');
 const { buildGenerationRecord, writeGenerationRecord } = require('./generationRecord');
 const { verifyGeneratedProject } = require('./generationVerifier');
 const { generationWarnings } = require('./warnings');
+const { placeServer } = require('./serverFromBackend');
 
 // Turns a fresh template copy (projectDir) into the requested project, in place.
 // value: validate().value. Throws when the template lacks an option or the result fails verification.
-async function generateCmpProject(value, { projectDir, generatorVersion = null }) {
+// backendTemplate ({ dir, repo, ref, commit }): a fresh backend template copy, required for blank with the backend; it
+// is moved into the project as server/. serverImageCheck: the verifier's server image check (default: Docker).
+async function generateCmpProject(value, { projectDir, generatorVersion = null, backendTemplate = null, serverImageCheck } = {}) {
     const { projectName, appName, packageName, templateType, features, featuresConfig, ci, minSdk, iosVersion } = value;
     const blankConfig = templateType === 'blank' ? featuresConfig : null;
+    const backendOn = templateType === 'blank' && featuresConfig.backend === true;
+    // Before anything is touched
+    if (backendOn && !(backendTemplate && backendTemplate.dir)) {
+        throw new Error('backend: the backend template is required (backendTemplate)');
+    }
 
     // An older template without the modules an on flag needs stops here, naming what is missing
     await assertTemplateCapabilities(projectDir, templateType, featuresConfig);
@@ -54,7 +62,7 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null }
     // template's own package before the rename below
     await applyBlankShell(projectDir, templateType, featuresConfig);
     // The backend's parts stay (markers dropped) for blank with backend on; everywhere else they go
-    await applyBackendOption(projectDir, templateType === 'blank' && featuresConfig.backend === true);
+    await applyBackendOption(projectDir, backendOn);
     await cloneFeatureModules(projectDir, sanitizedFeatures);
     log.info(`✅ Template skeleton ready (${sanitizedFeatures.length} feature modules)`);
 
@@ -82,21 +90,29 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null }
     // Store-ready: the privacy manifest declares the data the on flags collect (showcase: ads and
     // purchases on, never backend)
     await writePrivacyManifest(projectDir, templateType === 'blank'
-        ? { ads: featuresConfig.ads === true, purchases: featuresConfig.purchases === true, backend: featuresConfig.backend === true }
+        ? { ads: featuresConfig.ads === true, purchases: featuresConfig.purchases === true, backend: backendOn }
         : { ads: true, purchases: true, backend: false });
     log.info('✅ iOS configuration updated');
 
-    await fillReadme(projectDir, { versions, minSdk, iosVersion });
-
     // Package rename and module cloning moved imports out of ktlint order: re-sort them last
     await sortKotlinImports(projectDir);
+
+    // server/ comes from the backend template, after the app's rename and import sort (which never touch it)
+    const server = backendOn
+        ? await placeServer(projectDir, { packageName, projectName, backendTemplate, generatorVersion })
+        : null;
+    const serverTemplate = server ? server.template : null;
+
+    // After server/ is in place: the module list names it
+    await fillReadme(projectDir, { versions, minSdk, iosVersion });
 
     // The project's trace: which template, which generator, which options; no personal data
     await writeGenerationRecord(projectDir, buildGenerationRecord({
         templateRef, templateCommit, backendRevision: generatorVersion,
         templateType, ci, minSdk, iosVersion,
         features: sanitizedFeatures,
-        featuresConfig: blankConfig
+        featuresConfig: blankConfig,
+        serverTemplate
     }));
 
     // Last check: a broken project is never returned
@@ -104,12 +120,13 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null }
         projectName, appName, packageName, templateType,
         features: sanitizedFeatures,
         featuresConfig: blankConfig
-    });
+    }, serverImageCheck ? { serverImageCheck } : {});
 
     return {
         projectDir, templateRef, templateCommit, templateType,
         features: sanitizedFeatures,
         versions,
+        serverTemplate,
         warnings: generationWarnings({ templateType, featuresConfig })
     };
 }

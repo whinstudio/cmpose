@@ -32,13 +32,20 @@ function sanitizeFeaturesConfig(featuresConfig) {
     return { ...rest, customDetektYaml: typeof detektYamlContent === 'string' && detektYamlContent.trim().length > 0 };
 }
 
-/** The .cmpose/generation.json content written into the generated project (no personal data) */
-function buildGenerationRecord({ templateRef, templateCommit, backendRevision, templateType, ci, minSdk, iosVersion, features, featuresConfig, now = new Date() }) {
+/** The .cmpose/generation.json content written into the generated project (no personal data). backendRevision names
+ * the generator (backend.revision); serverTemplate is the backend template server/ came from, null without one. */
+function buildGenerationRecord({
+    templateRef, templateCommit, backendRevision, templateType, ci, minSdk, iosVersion, features, featuresConfig,
+    serverTemplate = null, now = new Date()
+}) {
     return {
         generator: 'cmpose',
         generatedAt: now.toISOString(),
         template: { ref: templateRef || null, commit: templateCommit || null },
         backend: { revision: backendRevision || null },
+        serverTemplate: serverTemplate
+            ? { repo: serverTemplate.repo || null, ref: serverTemplate.ref || null, commit: serverTemplate.commit || null }
+            : null,
         options: {
             templateType,
             ci: ci === true,

@@ -10,7 +10,7 @@ const { removeMarkedBlocks, applySwapMarkers } = require('./markerBlocks');
 
 const KIND_BY_EXTENSION = {
     '.kt': 'slash', '.kts': 'slash', '.swift': 'slash', '.xcconfig': 'slash',
-    '.toml': 'hash', '.gitignore': 'hash', '.properties': 'hash',
+    '.toml': 'hash', '.gitignore': 'hash', '.properties': 'hash', '.yml': 'hash', '.yaml': 'hash',
     '.md': 'html', '.xml': 'html', '.plist': 'html', '.xcprivacy': 'html'
 };
 const SKIP_DIRS = new Set(['.git', '.gradle', 'build', 'node_modules']);

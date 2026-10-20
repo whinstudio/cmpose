@@ -80,18 +80,41 @@ test('renderModules describes core/about as app version, legal links and licence
     assert.ok(out.includes('- `:core:about`: app version, legal links and open source licences'), out);
 });
 
-test('renderModules lists the backend modules and the server with descriptions', () => {
-    const settings = ['include(":shared")', 'include(":core:api")', 'include(":core:auth")', 'include(":server")'].join('\n');
+test('renderModules lists the backend modules with descriptions', () => {
+    const settings = ['include(":shared")', 'include(":core:api")', 'include(":core:auth")'].join('\n');
 
     const out = renderModules(settings);
 
     assert.ok(out.includes('- `:core:api`: models and routes shared by the app and the server'), out);
     assert.ok(out.includes("- `:core:auth`: Firebase sign-in: email, Google, Apple; the server client's token"), out);
-    assert.ok(out.includes('- `:server`: Ktor server: sign-in check, spaces, sharing, files; `./gradlew :server:runLocal`'), out);
+});
+
+const SERVER_LINE = '- `server/`: Ktor server from the cmpose backend template (an included build): sign-in check, spaces, sharing, files; '
+    + '`./gradlew :server:runLocal`; deploying: `server/deploy/README.md`';
+const INCLUDE_SERVER = '// server/ is generated from the cmpose backend template (an included build)\n'
+    + 'if (file("server/settings.gradle.kts").exists()) includeBuild("server")';
+
+test('includedServerBuildIsListed', async () => {
+    const settings = `include(":shared")\ninclude(":core:api")\n${INCLUDE_SERVER}\n`;
+    assert.ok(renderModules(settings, { serverDir: true }).endsWith(SERVER_LINE));
+    // not without server/, nor when the settings do not include it (a comment does not count)
+    assert.ok(!renderModules(settings).includes('server/'));
+    assert.ok(!renderModules('include(":shared")\n// includeBuild("server")\n', { serverDir: true }).includes('server/'));
+    // fillReadme looks for server/ itself
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmp-readme-server-'));
+    try {
+        await fs.outputFile(path.join(dir, 'README.md'), README);
+        await fs.outputFile(path.join(dir, 'settings.gradle.kts'), settings);
+        await fs.outputFile(path.join(dir, 'server', 'settings.gradle.kts'), 'rootProject.name = "demo"\n');
+        assert.equal(await fillReadme(dir, { versions: VERSIONS, minSdk: '24', iosVersion: '15.0' }), true);
+        assert.ok((await fs.readFile(path.join(dir, 'README.md'), 'utf8')).includes(SERVER_LINE));
+    } finally {
+        await fs.remove(dir);
+    }
 });
 
 test('renderModules does not list a server the settings do not include', () => {
-    assert.ok(!renderModules('include(":shared")').includes(':server'));
+    assert.ok(!renderModules('include(":shared")\ninclude(":server")', { serverDir: true }).includes('server'));
 });
 
 test('renderModules describes core/update as app updates', () => {

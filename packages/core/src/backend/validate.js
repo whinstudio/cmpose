@@ -22,6 +22,15 @@ function databaseNameProblem(appName) {
     return null;
 }
 
+// Why appName cannot name a backend (null = it can): the pattern, the route prefixes, then the database name
+function appNameProblem(appName) {
+    if (typeof appName !== 'string' || !APP_NAME_RE.test(appName)) {
+        return 'appName must be 2-31 lowercase letters, digits or -, starting with a letter';
+    }
+    if (S.appName.reserved.includes(appName)) return `appName "${appName}" is reserved (${S.appName.reserved.join(', ')})`;
+    return databaseNameProblem(appName);
+}
+
 // Why ref cannot name a backend template tag (null = it can); field names the input in the message
 function templateRefProblem(ref, field = 'templateRef') {
     if (typeof ref !== 'string' || !REF_RE.test(ref) || ref.startsWith('.')) {
@@ -40,14 +49,8 @@ function validateBackend(input) {
     if (typeof projectName !== 'string' || !PV.validateProjectName(projectName)) fail('projectName', PV.messages.projectNameInvalid);
     else if (projectName.length > PV.MAX_LENGTH_PROJECT_NAME) fail('projectName', PV.messages.projectNameTooLong);
 
-    if (typeof appName !== 'string' || !APP_NAME_RE.test(appName)) {
-        fail('appName', 'appName must be 2-31 lowercase letters, digits or -, starting with a letter');
-    } else if (S.appName.reserved.includes(appName)) {
-        fail('appName', `appName "${appName}" is reserved (${S.appName.reserved.join(', ')})`);
-    } else {
-        const problem = databaseNameProblem(appName);
-        if (problem) fail('appName', problem);
-    }
+    const nameProblem = appNameProblem(appName);
+    if (nameProblem) fail('appName', nameProblem);
 
     if (typeof packageName !== 'string' || !PV.validatePackageName(packageName) || isTemplatePackage(packageName)) {
         fail('packageName', PV.messages.packageNameInvalid);
@@ -75,4 +78,4 @@ function validateBackend(input) {
     return { ok: true, value };
 }
 
-module.exports = { validateBackend, templateRefProblem };
+module.exports = { validateBackend, templateRefProblem, appNameProblem };

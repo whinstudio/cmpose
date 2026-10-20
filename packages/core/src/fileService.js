@@ -2188,19 +2188,10 @@ async function processCoreFeatures(projectPath, config, packageName) {
             }
         }
 
-        // 6. Modules outside the convention plugins that apply it by id (core/api and the server: the
-        // backend's JVM-capable modules)
+        // 6. Modules outside the convention plugins that apply it by id (core/api, the backend's JVM-capable module;
+        // server/ is the backend template's own build with its own detekt, placed after this step)
         const detektPluginLine = `id("${packageName}.detekt")`;
-        for (const moduleDir of [path.join(projectPath, 'core', 'api'), path.join(projectPath, 'server')]) {
-            await dropLines(path.join(moduleDir, 'build.gradle.kts'), (line) => line.trim() === detektPluginLine);
-        }
-        // The server also points detekt at its local runner's sources
-        const serverGradle = path.join(projectPath, 'server', 'build.gradle.kts');
-        if (await fs.pathExists(serverGradle)) {
-            const content = await fs.readFile(serverGradle, 'utf8');
-            const cleaned = content.replace(/(?:^|\n)(?:\/\/[^\n]*\n)?detekt \{ source\.from\("src\/local\/kotlin"\) \}\n(?:[ \t]*\n)?/, '\n');
-            if (cleaned !== content) await fs.writeFile(serverGradle, cleaned);
-        }
+        await dropLines(path.join(projectPath, 'core', 'api', 'build.gradle.kts'), (line) => line.trim() === detektPluginLine);
 
         // The CI workflow's detekt step would fail without the plugin
         const ciPath = path.join(projectPath, '.github', 'workflows', 'ci.yml');

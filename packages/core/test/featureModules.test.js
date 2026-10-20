@@ -434,7 +434,8 @@ test('the capability check passes without monetization flags, for showcase, and 
 });
 
 // A template pinned before the backend release has none of the backend's directories
-const BACKEND_DIRS = ['server', 'core/api', 'core/auth', 'feature/account', 'feature/sharing'];
+// server/ is not the CMP template's: it comes from the backend template
+const BACKEND_DIRS = ['core/api', 'core/auth', 'feature/account', 'feature/sharing'];
 
 test('readiness (no config) does not need the backend directories; a backend request does', async () => {
     await withTempDir(async (dir) => {
@@ -442,7 +443,6 @@ test('readiness (no config) does not need the backend directories; a backend req
         assert.deepEqual(await missingTemplateCapabilities(dir), []);
         assert.deepEqual(await missingTemplateCapabilities(dir, { backend: false }), []);
         assert.deepEqual(await missingTemplateCapabilities(dir, { backend: true }), BACKEND_DIRS);
-        await fs.outputFile(path.join(dir, 'server', 'build.gradle.kts'), '');
         await fs.outputFile(path.join(dir, 'core', 'auth', 'build.gradle.kts'), '');
         assert.deepEqual(await missingTemplateCapabilities(dir, { backend: true }), ['core/api', 'feature/account', 'feature/sharing']);
     });
