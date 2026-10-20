@@ -9,7 +9,7 @@ const { fixtureCopy, read, exists, isExecutable, TEMPLATE_PKG_DIR } = require('.
 
 const MAIN = `src/main/kotlin/${TEMPLATE_PKG_DIR}/Main.kt`;
 const SHARING_PATHS = [`src/main/kotlin/${TEMPLATE_PKG_DIR}/sharing`, 'src/main/resources/db/migration/V2__sharing.sql',
-    `src/test/kotlin/${TEMPLATE_PKG_DIR}/SpaceRoutesTest.kt`];
+    'src/main/resources/db/migration/V5__invite_revoke.sql', `src/test/kotlin/${TEMPLATE_PKG_DIR}/SpaceRoutesTest.kt`];
 const SAMPLE_PATHS = [`src/main/kotlin/${TEMPLATE_PKG_DIR}/feature/sample`, 'src/main/resources/db/migration/V3__sample.sql',
     `src/test/kotlin/${TEMPLATE_PKG_DIR}/ItemRoutesTest.kt`];
 const ROUTING = `src/main/kotlin/${TEMPLATE_PKG_DIR}/Routing.kt`;

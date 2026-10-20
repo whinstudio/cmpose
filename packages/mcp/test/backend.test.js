@@ -255,7 +255,7 @@ test('backend_describe returns the contract version, the pin and the conventions
     assert.deepStrictEqual(facts.appNameRules.reserved, ['api', 'health', 'admin', 'static']);
     const conventions = JSON.stringify(facts.conventions);
     for (const rule of ['requireUser()', 'requireRole(', '404', 'feature/<name>/', 'feature/sample', 'ON DELETE CASCADE',
-        'SECURITY-CHECKLIST.md', './gradlew runLocal', '18001', '.local-server/config.properties', 'firebaseProjectId', 'deploy/']) {
+        'SECURITY-CHECKLIST.md', 'QUOTA_EXCEEDED', './gradlew runLocal', '18001', '.local-server/config.properties', 'firebaseProjectId', 'deploy/']) {
         assert.ok(conventions.includes(rule), `conventions miss ${rule}`);
     }
     await close();

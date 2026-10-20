@@ -121,7 +121,7 @@ as one Docker container behind nginx. `sharing` adds spaces, roles and invitatio
   warnings.
 - `backend_describe`: the backend generator's options, `appName` rules, the project anatomy and
   the conventions to follow when adding code (protected routes, the 404 rule, where features
-  go, the security checklist, the local runner and the deploy parts). Agents call it first.
+  go, the security checklist, the quotas, the local runner and the deploy parts). Agents call it first.
 - `backend_generate`: creates the backend. Required: `projectName` (letters only, up to 30),
   `appName` (the service name: 2 to 31 lowercase letters, digits or `-`, starting with a letter;
   not `api`, `health`, `admin` or `static`), `packageName` (e.g. `com.acme.notes`) and an

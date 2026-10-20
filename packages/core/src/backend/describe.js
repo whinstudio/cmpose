@@ -2,8 +2,20 @@
 const pins = require('../pins');
 const { BACKEND_SCHEMA: S, backendContractVersion } = require('./contract');
 
-/** What the Ktor backend generator offers, plus the rules an AI client follows when it writes code in the project */
-function describeBackend() {
+// The quota convention; sharing false leaves out the space, member and invite quotas
+function quotasConvention(sharing) {
+    if (sharing === false) {
+        return 'MAX_STORAGE_BYTES_PER_USER (default 100 MB) caps new writes; 0 turns it off. ' +
+            'A refused write answers 409 QUOTA_EXCEEDED with quota = storage.';
+    }
+    return 'MAX_STORAGE_BYTES_PER_USER (default 100 MB), and with sharing MAX_SPACES_PER_USER (20), MAX_MEMBERS_PER_SPACE (50) ' +
+        'and MAX_PENDING_INVITES_PER_SPACE (20) cap new writes; 0 turns one off. ' +
+        'A refused write answers 409 QUOTA_EXCEEDED with quota = storage | spaces | members | invites.';
+}
+
+/** What the Ktor backend generator offers, plus the rules an AI client follows when it writes code in the project.
+ * sharing false describes a project without sharing; left out, the conventions cover both. */
+function describeBackend({ sharing } = {}) {
     const port = S.anatomy.localPort;
     return {
         contractVersion: backendContractVersion(),
@@ -65,6 +77,7 @@ function describeBackend() {
                 'DTOs without id/owner/role fields, no SQL string building, no personal data in logs, rate limits on sensitive routes.',
             errors: 'Fail with notFound(), badRequest(...) or an ApiException; the body is {"error":{"code","message","requestId"}} (+ fields for validation). ' +
                 'A 500 carries no detail.',
+            quotas: quotasConvention(sharing),
             runLocal: `./gradlew ${S.anatomy.localTask} serves on 127.0.0.1:${port} with an embedded PostgreSQL in .local-server/; ` +
                 'it needs .local-server/config.properties with firebaseProjectId=<Firebase project id> (optional port=). ' +
                 './gradlew resetLocal deletes .local-server/; ./gradlew build compiles, runs detekt and the tests.',
