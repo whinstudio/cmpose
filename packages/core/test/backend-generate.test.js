@@ -9,7 +9,7 @@ const { verifyBackendProject } = require('../src/backend/verifier');
 const { buildBackendRecord } = require('../src/backend/record');
 const { backendContractVersion } = require('../src/backend/contract');
 const pins = require('../src/pins');
-const { fixtureCopy, read, exists, isExecutable } = require('./backend-helpers');
+const { fixtureCopy, read, exists, isExecutable, TEMPLATE_PKG_DIR } = require('./backend-helpers');
 
 function valueOf(request) {
     const { ok, value, errors } = validateBackend({
@@ -94,6 +94,18 @@ test('a sample leftover fails verification when sample is off', async (t) => {
     await fs.appendFile(path.join(projectDir, 'README.md'), '\nTry GET /items.\n');
     await assert.rejects(generateBackend(valueOf({ sample: false }), { projectDir }),
         /^Error: backend verification failed: sample word in README\.md \(sample is off\)$/);
+});
+
+test('a template older than the sample option fails with its ref, before anything changes', async (t) => {
+    const projectDir = await fixtureCopy(t);
+    await fs.remove(path.join(projectDir, 'tools', 'sample-paths.txt'));
+    await fs.writeFile(path.join(projectDir, '.template-ref'), 'backend-template-2026.10.01\n');
+    await assert.rejects(generateBackend(valueOf({ sample: false }), { projectDir }),
+        /^Error: backend template backend-template-2026\.10\.01 predates the sample option \(no tools\/sample-paths\.txt\); use a newer backend template tag$/);
+    // nothing was resolved or removed
+    assert.ok(await exists(projectDir, 'tools/sharing-paths.txt'));
+    assert.ok(await exists(projectDir, 'tools/resolve-markers.sh'));
+    assert.ok(await exists(projectDir, `src/main/kotlin/${TEMPLATE_PKG_DIR}/feature/sample`));
 });
 
 test('the record holds only known options', () => {

@@ -85,7 +85,7 @@ test('renderModules lists the backend modules with descriptions', () => {
 
     const out = renderModules(settings);
 
-    assert.ok(out.includes('- `:core:api`: models and routes shared by the app and the server'), out);
+    assert.ok(out.includes("- `:core:api`: the app's client models and routes for the backend API, checked by ApiContractTest"), out);
     assert.ok(out.includes("- `:core:auth`: Firebase sign-in: email, Google, Apple; the server client's token"), out);
 });
 

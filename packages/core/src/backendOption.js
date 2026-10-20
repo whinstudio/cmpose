@@ -18,6 +18,7 @@ const SKIP_DIRS = new Set(['.git', '.gradle', 'build', 'node_modules']);
 // Template-relative paths the backend adds outside the files it marks; deleted when backend is off
 const TEMPLATE_PACKAGE_PATH = 'com/kturker/multiplatform';
 const BACKEND_PATHS = [
+    // The template has no server/ of its own (it comes from the backend template); kept so a stale fetched copy goes too
     'server',
     'core/api',
     'core/auth',

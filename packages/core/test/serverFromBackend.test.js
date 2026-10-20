@@ -86,6 +86,16 @@ test('placeServerRemovesGithubAndRecord', async (t) => {
     assert.equal(await exists(server, 'tools/gate.sh'), false);
 });
 
+test('placeServer names the backend template ref that predates the sample option', async (t) => {
+    const raw = await fixtureCopy(t);
+    await fs.remove(path.join(raw, 'tools', 'sample-paths.txt'));
+    const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-place-'));
+    t.after(() => fs.remove(projectDir));
+    await assert.rejects(
+        placeServer(projectDir, { packageName: 'com.example.demo', projectName: 'Demo', backendTemplate: { dir: raw, ...TEMPLATE } }),
+        /^Error: backend template backend-template-test predates the sample option/);
+});
+
 test('placeServer refuses a project that already has server/', async (t) => {
     const raw = await fixtureCopy(t);
     const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-place-'));

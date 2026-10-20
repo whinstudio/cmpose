@@ -9,6 +9,9 @@ const { writeBackendRecord } = require('./record');
 const { verifyBackendProject } = require('./verifier');
 
 // The template cache's own records and the template's gate and notes never reach the project (tools/deploy-lint.sh stays)
+// Added with the sample option: a template without it is older than this generator (an error, never tolerated)
+const SAMPLE_PATHS_FILE = path.join('tools', 'sample-paths.txt');
+
 const LEFTOVERS = ['.git', COMMIT_FILE_NAME, REF_FILE_NAME, path.join('tools', 'gate.sh'), path.join('tools', 'TEMPLATE.md')];
 
 // Turns a fresh backend template copy (projectDir) into the requested project, in place. value: validateBackend().value.
@@ -17,6 +20,12 @@ async function generateBackend(value, { projectDir, templateRef = null, template
     const readMarker = (name) => fs.readFile(path.join(projectDir, name), 'utf8').then((v) => v.trim() || null, () => null);
     const ref = templateRef || (await readMarker(REF_FILE_NAME));
     const commit = templateCommit || (await readMarker(COMMIT_FILE_NAME));
+
+    // 0. a template older than the sample option cannot be generated: say which one, before anything changes
+    if (!(await fs.pathExists(path.join(projectDir, SAMPLE_PATHS_FILE)))) {
+        throw new Error(`backend template ${ref || '(unknown ref)'} predates the sample option `
+            + '(no tools/sample-paths.txt); use a newer backend template tag');
+    }
 
     // 1. options, sharing then sample (the template gate's order), before the package moves (tools/<option>-paths.txt
     // names the template's package dir); then the resolver's own tools go

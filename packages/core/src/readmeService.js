@@ -25,7 +25,7 @@ const CORE_DESCRIPTIONS = {
     update: 'app updates: Play In-App Updates, the App Store lookup and an optional minimum version',
     ads: 'AdMob ads and consent (test IDs)',
     room: 'Room database (bundled SQLite): AppDatabase, DAOs and schemas',
-    api: 'models and routes shared by the app and the server',
+    api: "the app's client models and routes for the backend API, checked by ApiContractTest",
     auth: "Firebase sign-in: email, Google, Apple; the server client's token"
 };
 

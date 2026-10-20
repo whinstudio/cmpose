@@ -36,7 +36,7 @@ function describeBackend() {
                 'src/main/kotlin/<package>/config': 'AppConfig: every setting, read from the environment',
                 'src/main/kotlin/<package>/plugins': 'errors, security headers, CORS, body limits, rate limits, request ids, client version',
                 'src/main/kotlin/<package>/auth': 'token verification and requireUser()',
-                'src/main/kotlin/<package>/users': 'GET and DELETE /api/v1/me',
+                'src/main/kotlin/<package>/users': 'GET and DELETE /api/v1/me, PUT /api/v1/me/profile',
                 'src/main/kotlin/<package>/files': 'uploads and downloads',
                 'src/main/kotlin/<package>/feature/sample': 'the sample feature (/api/v1/items): the shape to copy (sample only)',
                 'src/main/kotlin/<package>/sharing': 'spaces, roles and invitations (sharing only)',
