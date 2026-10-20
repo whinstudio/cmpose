@@ -11,7 +11,8 @@ const fail = (text) => ({ isError: true, content: [{ type: 'text', text }] });
 
 const NEXT_STEPS_BACKEND = [
     'Create .local-server/config.properties with firebaseProjectId=<your Firebase project id>, then run ./gradlew runLocal (port 18001).',
-    'Add features under feature/<name>/ by copying feature/sample, and go through SECURITY-CHECKLIST.md.',
+    // The add-a-feature convention itself, so the step is right whether the sample feature is there or not
+    `${core.backend.describeBackend().conventions.newFeature} Then go through SECURITY-CHECKLIST.md.`,
     'Read deploy/README.md for the server contract, the first deployment and updates.'
 ];
 
@@ -119,11 +120,14 @@ async function runBackendGenerate(args, {
         await fs.rename(work, target);
         const warnings = cache.local
             ? ['Generated from a local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), not a released tag.', ...localWarnings] : [];
-        const result = { projectDir: target, sharing: value.sharing, template: record.template, record, warnings, nextSteps: NEXT_STEPS_BACKEND };
+        const result = {
+            projectDir: target, sharing: value.sharing, sample: value.sample, template: record.template, record, warnings, nextSteps: NEXT_STEPS_BACKEND
+        };
         const text = [
             `Generated ${value.projectName} at ${target}`,
             `Template: ${record.template.repo}@${record.template.ref}${record.template.commit ? ` (${String(record.template.commit).slice(0, 7)})` : ''}`,
             `Sharing: ${value.sharing ? 'on' : 'off'}`,
+            `Sample: ${value.sample ? 'on' : 'off'}`,
             ...warnings.map((w) => `Warning: ${w}`),
             'Next steps:', ...NEXT_STEPS_BACKEND.map((s) => `- ${s}`)
         ].join('\n');

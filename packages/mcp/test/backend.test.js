@@ -93,6 +93,22 @@ test('backendGenerateForwardsSample', async (t) => {
     assert.strictEqual(on.structuredContent.record.sample, true);
 });
 
+test('backendGenerateReportsSample', async (t) => {
+    const { run } = await setup(t);
+    const newFeature = core.backend.describeBackend().conventions.newFeature;
+    for (const [args, flag, line] of [[{ sample: false }, false, 'Sample: off'], [{ projectName: 'NotesOn' }, true, 'Sample: on']]) {
+        const r = await run(args);
+        assert.notStrictEqual(r.isError, true, textOf(r));
+        assert.strictEqual(r.structuredContent.sample, flag);
+        const lines = textOf(r).split('\n');
+        assert.strictEqual(lines[lines.indexOf('Sharing: off') + 1], line);
+        // the add-a-feature step is the convention itself, right whether the sample is there or not
+        assert.ok(r.structuredContent.nextSteps.some((s) => s.includes(newFeature)));
+        for (const s of r.structuredContent.nextSteps) assert.doesNotMatch(s, /by copying feature\/sample/);
+        assert.doesNotMatch(textOf(r), /by copying feature\/sample/);
+    }
+});
+
 test('backend_generate refuses a non-empty target and changes nothing', async (t) => {
     const { outputDir, calls, run } = await setup(t);
     const target = path.join(outputDir, 'NotesBackend');
