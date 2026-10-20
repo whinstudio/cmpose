@@ -4,7 +4,7 @@ const { execFile } = require('child_process');
 const { log } = require('./log');
 const { listTextFiles } = require('./projectFiles');
 const { escapeRegExp, findResidue, BACKEND_RESIDUE_TOKENS } = require('./fileService');
-const { TEST_SOURCE_SET_REGEX } = require('./featureModules');
+const { TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('./featureModules');
 const { OLD_PACKAGE_NAME } = require('./templateIdentity');
 const { SERVER_DIR, INCLUDE_SERVER_BUILD, serverPackageOf } = require('./serverFromBackend');
 
@@ -84,8 +84,6 @@ function capitalize(name) {
 }
 
 const relPath = (projectPath, file) => path.relative(projectPath, file).split(path.sep).join('/');
-// The one test source set blank keeps: the Android-host Koin graph check
-const KOIN_GRAPH_TEST_DIR = 'shared/src/androidHostTest/';
 
 // Blank's shell wires the theme and the strings through its layers; Theming off leaves
 // no reference to the theme packages it removes; no template test ships (Compass's test gate).
@@ -121,7 +119,7 @@ async function verifyBlankShell(projectPath, input, problems) {
     for (const file of files) {
         const filePath = relPath(projectPath, file);
         const match = filePath.match(TEST_SOURCE_SET_REGEX);
-        if (!match || filePath.startsWith(KOIN_GRAPH_TEST_DIR)) continue;
+        if (!match || BLANK_KEPT_TEST_DIRS.some((dir) => filePath.startsWith(dir))) continue;
         const dir = filePath.slice(0, match.index + match[0].length - 1);
         problems.add(`${dir}: template tests in a blank project (Compass counts every iOS test as the agent's)`);
     }

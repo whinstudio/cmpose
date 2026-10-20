@@ -7,7 +7,7 @@ const fs = require('fs-extra');
 const { seedTemplate, OLD_PACKAGE_PATH } = require('./support/seedTemplate');
 const { OLD_PACKAGE_NAME } = require('../src/templateIdentity');
 const { BACKEND_PATHS } = require('../src/backendOption');
-const { TEST_SOURCE_SET_REGEX } = require('../src/featureModules');
+const { TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('../src/featureModules');
 const { validate } = require('../src/validate');
 const { generateCmpProject } = require('../src/generate');
 const { fixtureCopy } = require('./backend-helpers');
@@ -61,6 +61,10 @@ async function seedBackendSlice(dir) {
     }
     for (const feature of ['account', 'sharing']) {
         for (const layer of ['contract', 'presentation']) files[`feature/${feature}/${layer}/build.gradle.kts`] = 'plugins { }\n';
+    }
+    // core/api's tests: the contract test against server/ (Android host) and the models' common tests
+    for (const [sourceSet, name] of [['androidHostTest', 'ApiContractTest'], ['commonTest', 'ApiModelsTest']]) {
+        files[`core/api/src/${sourceSet}/kotlin/${OLD_PACKAGE_PATH}/core/api/${name}.kt`] = `package ${OLD_PACKAGE_NAME}.core.api\n`;
     }
     files['settings.gradle.kts'] = `rootProject.name = "Multiplatform"\ninclude(":composeApp")\n${slash(
         'include(":core:api")', 'include(":core:auth")', 'include(":feature:account:contract")', 'include(":feature:account:presentation")',
@@ -125,11 +129,14 @@ for (const [name, input] of [
 test('blank backend=true keeps the backend\'s paths and leaves no cmpose:backend text anywhere (backend)', async (t) => {
     const { projectDir } = await generateBackendSlice(t, { templateType: 'blank', featuresConfig: { backend: true } });
     for (const rel of BACKEND_PATHS) {
-        // Blank ships no template tests (but the Android-host Koin graph check), and blank/ itself goes
-        if (rel.startsWith('blank/') || (TEST_SOURCE_SET_REGEX.test(rel) && !rel.startsWith('shared/src/androidHostTest/'))) continue;
+        // Blank ships no template tests (but its Android-host checks), and blank/ itself goes
+        if (rel.startsWith('blank/') || (TEST_SOURCE_SET_REGEX.test(rel) && !BLANK_KEPT_TEST_DIRS.some((dir) => rel.startsWith(dir)))) continue;
         const generated = generatedPath(rel, 'com.example.demo');
         assert.strictEqual(await fs.pathExists(path.join(projectDir, generated)), true, generated);
     }
+    // The contract test checks the app against server/, so blank keeps it; core/api's common tests go
+    assert.ok(await fs.pathExists(path.join(projectDir, 'core/api/src/androidHostTest/kotlin/com/example/demo/core/api/ApiContractTest.kt')));
+    assert.strictEqual(await fs.pathExists(path.join(projectDir, 'core/api/src/commonTest')), false);
     for (const file of await listAll(projectDir)) {
         assert.ok(!(await fs.readFile(file, 'utf8')).includes('cmpose:backend'), path.relative(projectDir, file));
     }

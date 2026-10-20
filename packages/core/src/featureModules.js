@@ -34,6 +34,10 @@ const BLANK_ONLY_FEATURES = ['notes'];
 const NOTES_INCLUDE_REGEX = /^\s*include\("?:?feature:notes(?::(?:contract|presentation))?"\)\s*$/;
 // Cloned modules carry no test sources (Compass counts the iOS tests of a project as the agent's)
 const TEST_SOURCE_SET_REGEX = /(^|\/)src\/[^/]*Test\//;
+// The template test source sets a blank project keeps: Android-host checks only, never an iOS test. shared's Koin
+// graph check, and core/api's contract test (ApiContractTest: the app's models and routes against server/; core/api
+// is there only with the backend)
+const BLANK_KEPT_TEST_DIRS = ['shared/src/androidHostTest/', 'core/api/src/androidHostTest/'];
 
 function capitalize(name) {
     return name.charAt(0).toUpperCase() + name.slice(1);
@@ -242,6 +246,6 @@ async function cloneFeatureModules(projectPath, features) {
 }
 
 module.exports = {
-    applyBlankShell, cloneFeatureModules, wrapLongSingleParamSignatures, capitalize, TEST_SOURCE_SET_REGEX,
+    applyBlankShell, cloneFeatureModules, wrapLongSingleParamSignatures, capitalize, TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS,
     assertTemplateCapabilities, missingTemplateCapabilities, templateLacksMessage, TemplateCapabilityError
 };

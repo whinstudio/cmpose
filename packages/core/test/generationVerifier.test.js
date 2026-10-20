@@ -368,6 +368,7 @@ test('blank carries no template tests except the Android-host Koin graph check; 
     });
 });
 
+
 // Monetization (spec §10): blank keeps exactly the modules its purchases/ads flags ask for
 const MONETIZATION = (purchases, ads) => ({ ...INPUT, featuresConfig: { theming: false, multiLang: false, purchases, ads } });
 const INIT_KOIN = `shared/src/commonMain/kotlin/${PKG}/di/initKoin.kt`;
@@ -1354,6 +1355,23 @@ test('blank backend=true: a complete backend project passes (backend)', async ()
     await withProject(async (dir) => {
         await seedBackend(dir);
         assert.deepEqual(await backendProblems(dir, BACKEND_INPUT(true)), []);
+    });
+});
+
+// The contract test checks the app's models and routes against server/: blank keeps it (Android host, so not one of
+// the iOS tests Compass counts as the agent's); core/api's common tests go like every other template test
+test("blank backend=true keeps core/api's Android-host contract test, not its common tests (backend)", async () => {
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        // multiLang follows the backend: the shell's MainScreen provides the strings
+        await fs.outputFile(path.join(dir, SHARED, 'MainScreen.kt'),
+            'package dev.cmpose.demo\nCompositionLocalProvider(LocalStringResources provides resources) { }\nlanguageManager.setSystemLanguage()\n');
+        await fs.outputFile(path.join(dir, `core/api/src/androidHostTest/kotlin/${PKG}/core/api/ApiContractTest.kt`), 'class ApiContractTest\n');
+        await verifyGeneratedProject(dir, BACKEND_INPUT(true), { serverImageCheck: NO_DOCKER });
+
+        await fs.outputFile(path.join(dir, `core/api/src/commonTest/kotlin/${PKG}/core/api/ApiModelsTest.kt`), 'class ApiModelsTest\n');
+        await assert.rejects(verifyGeneratedProject(dir, BACKEND_INPUT(true), { serverImageCheck: NO_DOCKER }),
+            /core\/api\/src\/commonTest: template tests in a blank project/);
     });
 });
 

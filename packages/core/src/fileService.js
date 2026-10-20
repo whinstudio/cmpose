@@ -3,7 +3,7 @@ const path = require('path');
 const { listTextFiles } = require('./projectFiles');
 const { removeSwiftPackage } = require('./xcodePackages');
 const { stripPins } = require('./backendOption');
-const { capitalize, TEST_SOURCE_SET_REGEX } = require('./featureModules');
+const { capitalize, TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('./featureModules');
 const { removeMarkedBlock } = require('./readmeService');
 const { log } = require('./log');
 
@@ -84,12 +84,13 @@ const TEMPLATE_FEATURE_MODULES = {
     sharing: (cfg) => cfg.backend === true
 };
 
-// Deletes every test source set (src/*Test) of a Gradle module; a missing src/ is fine
-async function removeTestSourceSets(moduleDir) {
+// Deletes every test source set (src/*Test) of a Gradle module but those in BLANK_KEPT_TEST_DIRS; a missing src/ is fine
+async function removeTestSourceSets(projectPath, moduleDir) {
     const srcDir = path.join(moduleDir, 'src');
     if (!(await fs.pathExists(srcDir))) return;
     for (const sourceSet of await fs.readdir(srcDir)) {
-        if (TEST_SOURCE_SET_REGEX.test(`src/${sourceSet}/`)) await fs.remove(path.join(srcDir, sourceSet));
+        const rel = `${path.relative(projectPath, srcDir).split(path.sep).join('/')}/${sourceSet}/`;
+        if (TEST_SOURCE_SET_REGEX.test(rel) && !BLANK_KEPT_TEST_DIRS.includes(rel)) await fs.remove(path.join(srcDir, sourceSet));
     }
 }
 
@@ -926,8 +927,9 @@ async function processBlankApp(projectPath, packageName, features, featuresConfi
 
     // The template's own core tests (ThemeModeTest, ColorSchemeForTest, ...) stay in the showcase.
     // Compass counts every iOS test of a project as the agent's, so a blank app starts with none
-    // (clones carry none either, see featureModules.js); shared's Android-host Koin graph check stays.
-    // The same goes for the layers of the template's own feature modules (monetization, notes).
+    // (clones carry none either, see featureModules.js). The Android-host checks of BLANK_KEPT_TEST_DIRS stay:
+    // shared's Koin graph check and, with the backend, core/api's contract test against server/.
+    // The same goes for the layers of the template's own feature modules (monetization, notes, account, sharing).
     const testParents = [
         path.join(projectPath, 'core'),
         ...Object.keys(TEMPLATE_FEATURE_MODULES).map((module) => path.join(projectPath, 'feature', module))
@@ -935,7 +937,7 @@ async function processBlankApp(projectPath, packageName, features, featuresConfi
     for (const parentDir of testParents) {
         if (!(await fs.pathExists(parentDir))) continue;
         for (const moduleName of await fs.readdir(parentDir)) {
-            await removeTestSourceSets(path.join(parentDir, moduleName));
+            await removeTestSourceSets(projectPath, path.join(parentDir, moduleName));
         }
     }
 
@@ -1706,6 +1708,8 @@ async function processCoreFeatures(projectPath, config, packageName) {
                     'ktor-client-core',
                     'ktor-client-darwin',
                     'ktor-client-logging',
+                    // core/network's test client (MockEngine)
+                    'ktor-client-mock',
                     'ktor-serialization-kotlinx-json',
                     // Coil's network fetcher lives in core:network and goes with it
                     'coil-network-ktor3'

@@ -82,9 +82,28 @@ async function assertBackendOff(projectDir) {
     assert.deepEqual(pins.sort(), GMA_PINS);
 }
 
+// A test the project keeps compiles only with its module's test libraries: one that answers with Ktor's MockEngine
+// needs ktor-client-mock in that module's build file and in the catalog (the template once kept both for the backend)
+async function testsWithoutMockClient(projectDir) {
+    const missing = [];
+    const catalog = /^ktor-client-mock\s*=/m.test(await read(projectDir, 'gradle/libs.versions.toml'));
+    for (const file of await listTextFiles(projectDir)) {
+        const rel = path.relative(projectDir, file).split(path.sep).join('/');
+        const at = rel.indexOf('/src/');
+        if (!rel.endsWith('.kt') || at < 0 || !/^import io\.ktor\.client\.engine\.mock\./m.test(await fs.readFile(file, 'utf8'))) continue;
+        const build = `${rel.slice(0, at)}/build.gradle.kts`;
+        if (!(await read(projectDir, build)).includes('libs.ktor.client.mock')) missing.push(`${rel} (${build})`);
+        if (!catalog) missing.push(`${rel} (gradle/libs.versions.toml)`);
+    }
+    return missing;
+}
+
 test('real template, showcase: no backend part is left, GMA stays', OPTIONS, async (t) => {
     const projectDir = await generate(t, { projectName: 'Demo', packageName: 'com.example.demo', templateType: 'showcase' });
     await assertBackendOff(projectDir);
+    // core/network's BaseRepositoryTest keeps its MockEngine cases without the backend
+    assert.ok(await fs.pathExists(path.join(projectDir, 'core/network/src/commonTest/kotlin/com/example/demo/core/network/BaseRepositoryTest.kt')));
+    assert.deepEqual(await testsWithoutMockClient(projectDir), []);
 });
 
 test('real template, blank with purchases and ads, backend off: no backend part is left, GMA stays', OPTIONS, async (t) => {
@@ -136,6 +155,12 @@ test('real template, blank with the backend and a custom module: server, modules
         assert.ok(!rel.includes('feature/sample'), rel);
         assert.ok(!(await fs.readFile(file, 'utf8')).includes('io.cmpose.backendtemplate'), rel);
     }
+
+    // core/api keeps its contract test against server/ (Android host); its common tests go like blank's other ones
+    assert.ok(await fs.pathExists(path.join(projectDir, 'core/api/src/androidHostTest/kotlin/com/example/cloudlist/core/api/ApiContractTest.kt')),
+        'ApiContractTest missing');
+    assert.equal(await fs.pathExists(path.join(projectDir, 'core/api/src/commonTest')), false, 'core/api commonTest');
+    assert.deepEqual(await testsWithoutMockClient(projectDir), []);
 
     // detekt is off: core/api no longer applies its plugin (server/ keeps the backend template's own detekt)
     assert.ok(!(await read(projectDir, 'core/api/build.gradle.kts')).includes('.detekt")'), 'core/api/build.gradle.kts');
