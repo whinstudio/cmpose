@@ -81,3 +81,11 @@ adds code to the generated backend.
 The 5 real-template tests in `packages/core/test/fileService.importSort.test.js` run only
 when `CMP_REAL_TEMPLATE_DIR` points to a checkout of the template, e.g.
 `CMP_REAL_TEMPLATE_DIR=/path/to/template-checkout npm test`; otherwise they are skipped.
+
+`CMPOSE_BACKEND_TEMPLATE_DIR` points to a checkout of the backend template (an absolute path).
+The MCP server then generates from that checkout instead of the pinned tag: `backend_generate`
+and the `server/` of a `cmp_generate` blank project with the backend. Only git's tracked files
+are copied, and the result warns that it is not a released tag. The real backend-template tests
+in `packages/core/test/backend-generate.real.test.js` (and, together with `CMP_REAL_TEMPLATE_DIR`,
+in `generate.backend.real.test.js`) run only when it is set, e.g.
+`CMP_REAL_TEMPLATE_DIR=/path/to/template-checkout CMPOSE_BACKEND_TEMPLATE_DIR=/path/to/backend-template-checkout npm test`.
