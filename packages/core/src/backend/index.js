@@ -1,5 +1,5 @@
 'use strict';
-const { validateBackend } = require('./validate');
+const { validateBackend, templateRefProblem } = require('./validate');
 const { BACKEND_SCHEMA, backendContractVersion } = require('./contract');
 const { applyMarkerOption, applySharingOption, applySampleOption, removeResolverTools, resolveContent } = require('./options');
 const { applyBackendIdentity } = require('./identity');
@@ -10,6 +10,7 @@ const { describeBackend } = require('./describe');
 
 module.exports = {
     validateBackend,
+    templateRefProblem,
     BACKEND_SCHEMA,
     backendContractVersion,
     applyMarkerOption,

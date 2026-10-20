@@ -22,6 +22,14 @@ function databaseNameProblem(appName) {
     return null;
 }
 
+// Why ref cannot name a backend template tag (null = it can); field names the input in the message
+function templateRefProblem(ref, field = 'templateRef') {
+    if (typeof ref !== 'string' || !REF_RE.test(ref) || ref.startsWith('.')) {
+        return `${field} must be a tag or branch name (letters, digits, ., _ or -, not starting with .)`;
+    }
+    return null;
+}
+
 // Every problem as { field, message }; the value holds only the known fields (sharing defaults to false, sample to true)
 function validateBackend(input) {
     if (!isObject(input)) return { ok: false, errors: [{ field: 'input', message: 'input must be an object' }] };
@@ -52,8 +60,9 @@ function validateBackend(input) {
     if (sharing !== undefined && typeof sharing !== 'boolean') fail('sharing', 'sharing must be true or false');
     if (sample !== undefined && typeof sample !== 'boolean') fail('sample', 'sample must be true or false');
 
-    if (templateRef !== undefined && (typeof templateRef !== 'string' || !REF_RE.test(templateRef) || templateRef.startsWith('.'))) {
-        fail('templateRef', 'templateRef must be a tag or branch name (letters, digits, ., _ or -, not starting with .)');
+    if (templateRef !== undefined) {
+        const problem = templateRefProblem(templateRef);
+        if (problem) fail('templateRef', problem);
     }
 
     if (errors.length) return { ok: false, errors };
@@ -66,4 +75,4 @@ function validateBackend(input) {
     return { ok: true, value };
 }
 
-module.exports = { validateBackend };
+module.exports = { validateBackend, templateRefProblem };

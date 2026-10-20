@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs-extra');
 const core = require('@cmpose/core');
 const { DEFAULTS } = require('./describe');
+const { resolveBackendTemplate, copyBackendTemplate } = require('./backendTemplate');
 
 const fail = (text) => ({ isError: true, content: [{ type: 'text', text }] });
 
@@ -44,8 +45,23 @@ function coerceVersions(options) {
     return out;
 }
 
-async function runGenerate(args, { cacheDir, remoteUrl, onProgress = () => { }, generatorVersion = null } = {}) {
-    const { outputDir, templateRef, ...rest } = args || {};
+const BACKEND_REF_IGNORED = 'backendTemplateRef ignored: featuresConfig.backend is off';
+const LOCAL_BACKEND_WARNING = 'server/ was generated from a local backend template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), not a released tag.';
+
+// Blank with backend: server/ comes from the backend template (validated value, or the raw args with the defaults)
+const usesBackendTemplate = ({ templateType = DEFAULTS.templateType, featuresConfig } = {}) =>
+    templateType === 'blank' && Boolean(featuresConfig) && featuresConfig.backend === true;
+
+// The progress steps of a run: the backend template, the CMP template, the generation
+const progressSteps = (args) => (usesBackendTemplate(args || {}) ? 3 : 2);
+
+// backendTemplateDir: a local backend template checkout used instead of the cache (CMPOSE_BACKEND_TEMPLATE_DIR).
+// cacheEnsure serves both templates (the tests inject one for the two repos).
+async function runGenerate(args, {
+    cacheDir, remoteUrl, onProgress = () => { }, generatorVersion = null,
+    backendTemplateDir = null, cacheEnsure = core.templateCache.ensure
+} = {}) {
+    const { outputDir, templateRef, backendTemplateRef, ...rest } = args || {};
     const options = coerceVersions(rest);
     if (typeof outputDir !== 'string' || !path.isAbsolute(outputDir)) {
         return fail('outputDir must be an absolute path (for example /path/to/projects).');
@@ -59,15 +75,29 @@ async function runGenerate(args, { cacheDir, remoteUrl, onProgress = () => { }, 
     if (!checked.ok) return fail(checked.error);
     const value = checked.value;
     const target = path.join(outputDir, value.projectName);
+    const withBackend = usesBackendTemplate(value);
+    if (withBackend && backendTemplateRef !== undefined) {
+        const refProblem = core.backend.templateRefProblem(backendTemplateRef, 'backendTemplateRef');
+        if (refProblem) return fail(refProblem);
+    }
     const problem = await targetProblem(target);
     if (problem) return fail(problem);
 
     const template = { repo: core.pins.cmp.repo, ref: templateRef || core.pins.cmp.ref, cacheDir };
     let cache;
+    let backend = null;
     try {
+        // Before the CMP template: a PENDING pin or a bad checkout fails before anything is downloaded or written.
+        // remoteUrl names the CMP template's remote, so the backend template keeps its own.
+        if (withBackend) {
+            backend = await resolveBackendTemplate({
+                templateRef: backendTemplateRef, templateDir: backendTemplateDir, cacheDir, cacheEnsure,
+                onProgress: (m) => onProgress(m.replace(/\btemplate\b/, 'server template'))
+            });
+        }
         const cached = await core.templateCache.isCached(template);
         onProgress(cached ? 'Preparing the template' : 'Downloading the template (first run only)');
-        cache = await core.templateCache.ensure({ ...template, remoteUrl });
+        cache = await cacheEnsure({ ...template, remoteUrl });
     } catch (err) {
         if (err instanceof core.TemplateFetchError || err instanceof TypeError) return fail(err.message);
         throw err;
@@ -78,10 +108,17 @@ async function runGenerate(args, { cacheDir, remoteUrl, onProgress = () => { }, 
 
     await fs.ensureDir(outputDir);
     const work = path.join(outputDir, `.cmpose-${crypto.randomBytes(6).toString('hex')}`);
+    // The backend template's raw copy, beside the work dir; core places it as server/
+    const serverRaw = `${work}-server`;
     try {
         onProgress('Generating the project');
+        let backendWarnings = [];
+        if (backend) backendWarnings = await copyBackendTemplate(backend, serverRaw);
         await fs.copy(cache.dir, work);
-        const summary = await core.generateCmpProject(value, { projectDir: work, generatorVersion });
+        const summary = await core.generateCmpProject(value, {
+            projectDir: work, generatorVersion,
+            ...(backend ? { backendTemplate: { dir: serverRaw, repo: backend.repo, ref: backend.ref, commit: backend.commit } } : {})
+        });
         const late = await targetProblem(target);
         if (late) throw new Error(late);
         await removeEmptyDir(target); // never recursive: a concurrent run's project stays intact
@@ -90,18 +127,22 @@ async function runGenerate(args, { cacheDir, remoteUrl, onProgress = () => { }, 
         if (value.templateType === 'showcase' && options.featuresConfig !== undefined) {
             warnings.push('featuresConfig is ignored for showcase (it applies to blank only); the showcase template has its own fixed feature set');
         }
+        if (!withBackend && backendTemplateRef !== undefined) warnings.push(BACKEND_REF_IGNORED);
+        if (backend && backend.local) warnings.push(LOCAL_BACKEND_WARNING, ...backendWarnings);
         const result = {
             projectDir: target,
             template: { repo: core.pins.cmp.repo, ref: cache.ref, commit: cache.commit },
             templateType: summary.templateType,
             features: summary.features,
             featuresConfig: value.templateType === 'blank' ? value.featuresConfig : null,
+            ...(backend ? { backendTemplate: { repo: backend.repo, ref: backend.ref, commit: backend.commit } } : {}),
             warnings,
             nextSteps: NEXT_STEPS
         };
         const text = [
             `Generated ${value.projectName} at ${target}`,
             `Template: ${result.template.repo}@${result.template.ref} (${String(cache.commit).slice(0, 7)})`,
+            ...(backend ? [`Server template: ${backend.repo}@${backend.ref}${backend.commit ? ` (${String(backend.commit).slice(0, 7)})` : ''}`] : []),
             ...warnings.map((w) => `Warning: ${w}`),
             'Next steps:', ...NEXT_STEPS.map((s) => `- ${s}`)
         ].join('\n');
@@ -109,7 +150,9 @@ async function runGenerate(args, { cacheDir, remoteUrl, onProgress = () => { }, 
     } catch (err) {
         await fs.remove(work).catch(() => { });
         return fail(`Generation failed: ${err.message}`);
+    } finally {
+        await fs.remove(serverRaw).catch(() => { });
     }
 }
 
-module.exports = { runGenerate, removeEmptyDir, targetProblem, NEXT_STEPS };
+module.exports = { runGenerate, progressSteps, removeEmptyDir, targetProblem, NEXT_STEPS };
