@@ -91,8 +91,8 @@ async function runGenerate(args, {
         // remoteUrl names the CMP template's remote, so the backend template keeps its own.
         if (withBackend) {
             backend = await resolveBackendTemplate({
-                templateRef: backendTemplateRef, templateDir: backendTemplateDir, cacheDir, cacheEnsure,
-                onProgress: (m) => onProgress(m.replace(/\btemplate\b/, 'server template'))
+                templateRef: backendTemplateRef, templateDir: backendTemplateDir, cacheDir, cacheEnsure, onProgress,
+                refField: 'backendTemplateRef', label: 'server template'
             });
         }
         const cached = await core.templateCache.isCached(template);

@@ -212,7 +212,8 @@ async function filesUnder(dir) {
 
 // Two remote repos behind one injected cacheEnsure: the CMP seed through the real cache, the backend fixture stubbed.
 // core.generateCmpProject is captured when it gets a backendTemplate (the seed has no backend modules to generate).
-async function backendSetup(t) {
+// failGeneration: the captured generation throws, as a failing server/ placement would
+async function backendSetup(t, { failGeneration = false } = {}) {
     const base = await setup();
     t.after(base.cleanup);
     const template = await fixtureCopy(t);
@@ -230,6 +231,7 @@ async function backendSetup(t) {
     core.generateCmpProject = async (value, opts) => {
         if (!opts.backendTemplate) return original(value, opts);
         seen.push({ opts, files: await filesUnder(opts.backendTemplate.dir) });
+        if (failGeneration) throw new Error('server placement failed');
         return { warnings: [], templateType: value.templateType, features: value.features };
     };
     t.after(() => { core.generateCmpProject = original; });
@@ -261,6 +263,7 @@ test('backendOnFetchesThePinnedBackendTemplate', async (t) => {
     assert.ok(await fs.pathExists(path.join(outputDir, 'Demo')));
     assert.deepStrictEqual(await leftovers(outputDir), []);
     assert.strictEqual(progress.length, 3, progress.join(' | '));
+    assert.deepStrictEqual(progress, ['Downloading the server template (first run only)', 'Downloading the template (first run only)', 'Generating the project']);
 });
 
 test('backendTemplateRefOverridesThePin', async (t) => {
@@ -289,9 +292,22 @@ test('pendingBackendPinIsRefused', async (t) => {
     const { outputDir, calls, seen, run } = await backendSetup(t);
     const r = await run({ ...BACKEND_ON, backendTemplateRef: 'backend-template-PENDING' });
     assert.strictEqual(r.isError, true);
-    assert.match(r.content[0].text, /not released yet; pass templateRef or set CMPOSE_BACKEND_TEMPLATE_DIR/);
+    // cmp_generate names its own field; backend_generate's hint (templateRef) is unchanged
+    assert.strictEqual(r.content[0].text, 'The backend template is not released yet; pass backendTemplateRef or set CMPOSE_BACKEND_TEMPLATE_DIR.');
     assert.deepStrictEqual(calls, []);
     assert.deepStrictEqual(seen, []);
+    assert.deepStrictEqual(await fs.readdir(outputDir), []);
+});
+
+test('backendRawCopyIsRemovedWhenGenerationFails', async (t) => {
+    const { outputDir, seen, run } = await backendSetup(t, { failGeneration: true });
+    const r = await run(BACKEND_ON);
+    assert.strictEqual(r.isError, true);
+    assert.strictEqual(r.content[0].text, 'Generation failed: server placement failed');
+    // the raw copy existed while core ran, and neither it nor the work dir nor a half project is left
+    assert.ok(seen[0].files.includes('src/main/kotlin/io/cmpose/backendtemplate/Main.kt'));
+    assert.deepStrictEqual(await leftovers(outputDir), []);
+    assert.strictEqual(await fs.pathExists(path.join(outputDir, 'Demo')), false);
     assert.deepStrictEqual(await fs.readdir(outputDir), []);
 });
 

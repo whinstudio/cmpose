@@ -58,20 +58,24 @@ async function copyLocalTemplate(dir, dest) {
 
 // The template source: a local checkout (templateDir / CMPOSE_BACKEND_TEMPLATE_DIR) or the template cache.
 // Throws TypeError (bad local path, PENDING pin) or core.TemplateFetchError (download).
-async function resolveBackendTemplate({ templateRef, templateDir, cacheDir, remoteUrl, cacheEnsure = core.templateCache.ensure, onProgress = () => { } }) {
+// refField names the caller's ref input in the PENDING hint; label names the template in the progress messages.
+async function resolveBackendTemplate({
+    templateRef, templateDir, cacheDir, remoteUrl, cacheEnsure = core.templateCache.ensure, onProgress = () => { },
+    refField = 'templateRef', label = 'template'
+}) {
     const repo = core.pins.backend.repo;
     if (templateDir) {
         const stat = path.isAbsolute(templateDir) ? await fs.stat(templateDir).catch(() => null) : null;
         if (!stat || !stat.isDirectory()) throw new TypeError('CMPOSE_BACKEND_TEMPLATE_DIR must be the absolute path of a backend template checkout.');
-        onProgress('Preparing the local template');
+        onProgress(`Preparing the local ${label}`);
         return { dir: templateDir, repo, ref: templateRef || 'local', commit: null, local: true };
     }
     const template = { repo, ref: templateRef || core.pins.backend.ref, cacheDir };
     if (isPending(template.ref)) {
-        throw new TypeError('The backend template is not released yet; pass templateRef or set CMPOSE_BACKEND_TEMPLATE_DIR.');
+        throw new TypeError(`The backend template is not released yet; pass ${refField} or set CMPOSE_BACKEND_TEMPLATE_DIR.`);
     }
     const cached = await core.templateCache.isCached(template);
-    onProgress(cached ? 'Preparing the template' : 'Downloading the template (first run only)');
+    onProgress(cached ? `Preparing the ${label}` : `Downloading the ${label} (first run only)`);
     const cache = await cacheEnsure({ ...template, remoteUrl });
     return { dir: cache.dir, repo, ref: cache.ref, commit: cache.commit, local: false };
 }
