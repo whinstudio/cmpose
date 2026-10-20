@@ -4,7 +4,10 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs-extra');
 
-const { verifyGeneratedProject, verifyBackend, checkServerImage } = require('../src/generationVerifier');
+const {
+    verifyGeneratedProject, verifyBackend, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV
+} = require('../src/generationVerifier');
+const { setLogger } = require('../src/log');
 
 const INPUT = { projectName: 'Demo', appName: 'Demo App', packageName: 'dev.cmpose.demo', templateType: 'blank', features: [] };
 const PKG = 'dev/cmpose/demo';
@@ -1541,5 +1544,86 @@ test('the server image check is SKIP without Docker (backend)', async () => {
     await withProject(async (dir) => {
         assert.deepEqual(await checkServerImage(dir, { docker: path.join(dir, 'no-docker-here') }),
             { status: 'SKIP', detail: 'Docker is not available' });
+    });
+});
+
+test('the server image check is opt-in: the option wins, then CMPOSE_SERVER_IMAGE_CHECK=1 (backend)', () => {
+    const stub = async () => ({ status: 'PASS' });
+    assert.equal(SERVER_IMAGE_ENV, 'CMPOSE_SERVER_IMAGE_CHECK');
+    assert.equal(resolveServerImageCheck(undefined, {}), null);
+    assert.equal(resolveServerImageCheck(undefined, { CMPOSE_SERVER_IMAGE_CHECK: '0' }), null);
+    assert.equal(resolveServerImageCheck(undefined, { CMPOSE_SERVER_IMAGE_CHECK: '1' }), checkServerImage);
+    assert.equal(resolveServerImageCheck(true, {}), checkServerImage);
+    assert.equal(resolveServerImageCheck(stub, {}), stub);
+    assert.equal(resolveServerImageCheck(stub, { CMPOSE_SERVER_IMAGE_CHECK: '1' }), stub);
+    assert.equal(resolveServerImageCheck(false, { CMPOSE_SERVER_IMAGE_CHECK: '1' }), null);
+});
+
+test('without the option or the env var the server image is SKIP, not requested, and docker is not called (backend)', async (t) => {
+    const logged = [];
+    setLogger({ info: (...a) => logged.push(a.join(' ')), warn() { }, error() { } });
+    t.after(() => setLogger(null));
+    await withProject(async (dir) => {
+        await seedBackend(dir);
+        const input = { ...INPUT, featuresConfig: { theming: false, multiLang: false, backend: true } };
+        // the seed has no Dockerfile: a real build would fail the verification
+        await verifyGeneratedProject(dir, input, { env: {} });
+        assert.ok(logged.includes('⏭️ server image: SKIP (not requested (set CMPOSE_SERVER_IMAGE_CHECK=1))'), logged.join('\n'));
+        // the env var asks for it: the option still wins
+        let called = 0;
+        const stub = async () => { called++; return { status: 'FAIL', detail: 'x' }; };
+        await assert.rejects(verifyGeneratedProject(dir, input, { serverImageCheck: stub, env: { CMPOSE_SERVER_IMAGE_CHECK: '1' } }), /server image/);
+        await verifyGeneratedProject(dir, input, { serverImageCheck: false, env: { CMPOSE_SERVER_IMAGE_CHECK: '1' } });
+        assert.equal(called, 1);
+    });
+});
+
+// A docker stand-in: logs its arguments and directory, answers info, build and image rm
+async function stubDocker(dir, { build }) {
+    const script = path.join(dir, 'docker-stub');
+    const log = path.join(dir, 'docker.log');
+    await fs.writeFile(script, [
+        '#!/bin/sh',
+        `echo "$PWD|$*" >> '${log}'`,
+        'case "$1" in',
+        '  info) echo 27.0.0 ;;',
+        `  build) ${build} ;;`,
+        '  image) echo deleted ;;',
+        'esac',
+        ''
+    ].join('\n'));
+    await fs.chmod(script, 0o755);
+    return { script, calls: async () => (await fs.readFile(log, 'utf8')).trim().split('\n') };
+}
+
+test('checkServerImage PASS: builds server/ from the project root, reads the image id and removes the image (backend)', async () => {
+    await withProject(async (dir) => {
+        const tools = await fs.mkdtemp(path.join(os.tmpdir(), 'cmp-docker-stub-'));
+        try {
+            const docker = await stubDocker(tools, { build: 'echo "#1 building" >&2; echo sha256:abc123' });
+            assert.deepEqual(await checkServerImage(dir, { docker: docker.script }), { status: 'PASS', detail: 'sha256:abc123' });
+            const calls = (await docker.calls()).map((line) => line.split('|'));
+            assert.deepEqual(calls.map(([, args]) => args),
+                ['info --format {{.ServerVersion}}', 'build --quiet -f server/deploy/Dockerfile server', 'image rm sha256:abc123']);
+            // the build runs from the project root
+            assert.equal(calls[1][0], await fs.realpath(dir));
+        } finally {
+            await fs.remove(tools);
+        }
+    });
+});
+
+test('checkServerImage FAIL: the last five stderr lines, joined with | (backend)', async () => {
+    await withProject(async (dir) => {
+        const tools = await fs.mkdtemp(path.join(os.tmpdir(), 'cmp-docker-stub-'));
+        try {
+            const docker = await stubDocker(tools, { build: 'for n in 1 2 3 4 5 6 7; do echo "line $n" >&2; done; exit 1' });
+            assert.deepEqual(await checkServerImage(dir, { docker: docker.script }),
+                { status: 'FAIL', detail: 'line 3 | line 4 | line 5 | line 6 | line 7' });
+            // no image to remove after a failed build
+            assert.equal((await docker.calls()).length, 2);
+        } finally {
+            await fs.remove(tools);
+        }
     });
 });

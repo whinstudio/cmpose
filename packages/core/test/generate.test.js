@@ -170,3 +170,18 @@ test('backendOnPlacesServerAndRecordsItsTemplate', async (t) => {
     const readme = await fs.readFile(path.join(projectDir, 'README.md'), 'utf8');
     assert.ok(readme.includes('- `server/`: Ktor server from the cmpose backend template (an included build)'), readme);
 });
+
+test('a CMP template that already has server/ fails before the pipeline runs (backend)', async (t) => {
+    const projectDir = await freshCopy();
+    t.after(() => fs.remove(projectDir));
+    await seedBackendSlice(projectDir);
+    await fs.outputFile(path.join(projectDir, 'server', 'build.gradle.kts'), 'plugins { }\n');
+    const { value } = validate({ projectName: 'Demo', appName: 'Demo App', packageName: 'com.example.demo', minSdk: '24', iosVersion: '15.0',
+        templateType: 'blank', featuresConfig: { backend: true } });
+    const raw = await fixtureCopy(t);
+    await assert.rejects(generateCmpProject(value, { projectDir, backendTemplate: { dir: raw, ...BACKEND_TEMPLATE } }),
+        { message: 'backend: the CMP template already has server/, which comes from the backend template (use a newer templateRef)' });
+    // nothing was touched: the cache markers and the backend template copy are where they were
+    assert.ok(await fs.pathExists(path.join(projectDir, '.template-commit')));
+    assert.ok(await fs.pathExists(raw));
+});

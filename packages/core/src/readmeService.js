@@ -1,6 +1,7 @@
 const { log } = require('./log');
 const fs = require('fs-extra');
 const path = require('path');
+const { INCLUDE_SERVER_BUILD, SERVER_DIR } = require('./serverFromBackend');
 
 // The generated README's requirements table and module map. The template's README marks
 // both sections (<!-- cmpose:requirements --> … <!-- /cmpose:requirements -->); a README without
@@ -48,8 +49,7 @@ function renderRequirements(versions, { minSdk, iosVersion }) {
     ].join('\n');
 }
 
-// server/ is an included build (includeBuild("server") on a line that is not a comment), not a module
-const INCLUDE_SERVER_BUILD = /^(?![ \t]*\/\/).*\bincludeBuild\("server"\)/m;
+// server/ is an included build (INCLUDE_SERVER_BUILD), not a module
 const SERVER_LINE = '- `server/`: Ktor server from the cmpose backend template (an included build): sign-in check, spaces, sharing, files; '
     + '`./gradlew :server:runLocal`; deploying: `server/deploy/README.md`';
 
@@ -103,7 +103,7 @@ async function fillReadme(projectPath, { versions, minSdk, iosVersion }) {
         if (!content.includes('<!-- cmpose:requirements -->') && !content.includes('<!-- cmpose:modules -->')) return false;
         const settings = await fs.readFile(path.join(projectPath, 'settings.gradle.kts'), 'utf8').catch(() => '');
         let updated = replaceBetweenMarkers(content, 'cmpose:requirements', renderRequirements(versions, { minSdk, iosVersion }));
-        const serverDir = await fs.pathExists(path.join(projectPath, 'server'));
+        const serverDir = await fs.pathExists(path.join(projectPath, SERVER_DIR));
         updated = replaceBetweenMarkers(updated, 'cmpose:modules', renderModules(settings, { serverDir }));
         await fs.writeFile(readmePath, updated);
         return true;

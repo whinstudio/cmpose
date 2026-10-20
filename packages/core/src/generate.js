@@ -16,19 +16,23 @@ const { fillReadme } = require('./readmeService');
 const { buildGenerationRecord, writeGenerationRecord } = require('./generationRecord');
 const { verifyGeneratedProject } = require('./generationVerifier');
 const { generationWarnings } = require('./warnings');
-const { placeServer } = require('./serverFromBackend');
+const { placeServer, SERVER_DIR } = require('./serverFromBackend');
 
 // Turns a fresh template copy (projectDir) into the requested project, in place.
 // value: validate().value. Throws when the template lacks an option or the result fails verification.
 // backendTemplate ({ dir, repo, ref, commit }): a fresh backend template copy, required for blank with the backend; it
-// is moved into the project as server/. serverImageCheck: the verifier's server image check (default: Docker).
+// is moved into the project as server/. serverImageCheck: the verifier's server image check (opt-in: a check, true for
+// Docker, false for none; unset, CMPOSE_SERVER_IMAGE_CHECK=1 asks for Docker).
 async function generateCmpProject(value, { projectDir, generatorVersion = null, backendTemplate = null, serverImageCheck } = {}) {
     const { projectName, appName, packageName, templateType, features, featuresConfig, ci, minSdk, iosVersion } = value;
     const blankConfig = templateType === 'blank' ? featuresConfig : null;
     const backendOn = templateType === 'blank' && featuresConfig.backend === true;
-    // Before anything is touched
+    // Before anything is touched: server/ comes from the backend template only
     if (backendOn && !(backendTemplate && backendTemplate.dir)) {
         throw new Error('backend: the backend template is required (backendTemplate)');
+    }
+    if (backendOn && (await fs.pathExists(path.join(projectDir, SERVER_DIR)))) {
+        throw new Error(`backend: the CMP template already has ${SERVER_DIR}/, which comes from the backend template (use a newer templateRef)`);
     }
 
     // An older template without the modules an on flag needs stops here, naming what is missing
@@ -120,7 +124,7 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
         projectName, appName, packageName, templateType,
         features: sanitizedFeatures,
         featuresConfig: blankConfig
-    }, serverImageCheck ? { serverImageCheck } : {});
+    }, { serverImageCheck });
 
     return {
         projectDir, templateRef, templateCommit, templateType,

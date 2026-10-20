@@ -11,6 +11,8 @@ const { generateBackend } = require('./backend/generate');
 
 const SERVER_DIR = 'server';
 const LOCAL_SERVER_DIR_LINE = 'localServerDir=../.local-server';
+// The root settings' includeBuild("server") on a line that is not a comment (the template guards it with an if)
+const INCLUDE_SERVER_BUILD = /^(?![ \t]*\/\/).*\bincludeBuild\("server"\)/m;
 // The template's CI and the backend's own generation record: the app's CI and record cover server/
 const SERVER_LEFTOVERS = ['.github', '.cmpose'];
 const BASE_MAX = 27;
@@ -50,7 +52,8 @@ async function writeLocalServerDir(serverDir) {
 }
 
 /** Moves a fresh backend template copy (backendTemplate.dir) to <projectDir>/server and generates it there. Fails when
- * server/ already exists. Returns the server's appName, package and template. */
+ * server/ already exists. Returns the server's appName, package and template.
+ * On a failure part way, server/ may be half written: the caller discards the project dir. */
 async function placeServer(projectDir, { packageName, projectName, backendTemplate, generatorVersion = null, now = new Date() }) {
     const { dir, repo = null, ref = null, commit = null } = backendTemplate || {};
     if (!dir) throw new Error('backend: the backend template is required (backendTemplate)');
@@ -76,4 +79,4 @@ async function placeServer(projectDir, { packageName, projectName, backendTempla
     return { appName, packageName: serverPackage, template: { repo, ref, commit } };
 }
 
-module.exports = { deriveServerAppName, placeServer, serverPackageOf, SERVER_DIR, LOCAL_SERVER_DIR_LINE };
+module.exports = { deriveServerAppName, placeServer, serverPackageOf, SERVER_DIR, LOCAL_SERVER_DIR_LINE, INCLUDE_SERVER_BUILD };

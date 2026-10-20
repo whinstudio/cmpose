@@ -6,6 +6,7 @@ const { listTextFiles } = require('./projectFiles');
 const { escapeRegExp, findResidue, BACKEND_RESIDUE_TOKENS } = require('./fileService');
 const { TEST_SOURCE_SET_REGEX } = require('./featureModules');
 const { OLD_PACKAGE_NAME } = require('./templateIdentity');
+const { SERVER_DIR, INCLUDE_SERVER_BUILD, serverPackageOf } = require('./serverFromBackend');
 
 // The template's own identity: if it is left in a generated project, the rename missed a spot.
 // The user's input can carry the same text (appName accepts dots and letters, ≤30; the project name
@@ -507,13 +508,10 @@ const BACKEND_MODULES = [
     { dir: 'feature/account', build: 'feature/account/presentation/build.gradle.kts', include: ':feature:account:presentation' },
     { dir: 'feature/sharing', build: 'feature/sharing/presentation/build.gradle.kts', include: ':feature:sharing:presentation' }
 ];
-const SERVER_DIR = 'server';
 const BACKEND_SHARED_DEPENDENCIES = ['projects.core.auth', 'projects.feature.account.presentation', 'projects.feature.sharing.presentation'];
 const BACKEND_KOIN_MODULES = ['AuthModule', 'AccountModule', 'SharingModule'];
 const GOOGLE_URL_SCHEME = '<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>';
 const BACKEND_MARKER = 'cmpose:backend';
-// An includeBuild("server") on a line that is not a comment (the template guards it with an if)
-const INCLUDE_SERVER_BUILD = /^(?![ \t]*\/\/).*\bincludeBuild\("server"\)/m;
 const LOCAL_SERVER_DIR = /^[ \t]*localServerDir[ \t]*=[ \t]*\.\.\/\.local-server[ \t]*$/m;
 const BACKEND_TEMPLATE_PACKAGE = 'io.cmpose.backendtemplate';
 const SERVER_PRUNED = new Set(['.git', '.gradle', '.kotlin', 'build', '.local-server']);
@@ -540,12 +538,12 @@ async function verifyServer(projectPath, input, settings, problems) {
         if (!(await exists(rel))) problems.add(`${rel}: missing although backend is on`);
     }
     if (!INCLUDE_SERVER_BUILD.test(settings)) problems.add('settings.gradle.kts: includeBuild("server") missing although backend is on');
-    if (!LOCAL_SERVER_DIR.test(await readIfExists(path.join(projectPath, 'server', 'gradle.properties')))) {
+    if (!LOCAL_SERVER_DIR.test(await readIfExists(path.join(projectPath, SERVER_DIR, 'gradle.properties')))) {
         problems.add('server/gradle.properties: localServerDir=../.local-server missing (the local server lives in the root .local-server/)');
     }
     if (await exists('server/.github')) problems.add('server/.github: the backend template\'s CI left (the project\'s own CI builds server/)');
-    const packagePath = input.packageName.replace(/\./g, '/');
-    for (const rel of [`server/src/main/kotlin/${packagePath}/server`, `server/src/local/kotlin/${packagePath}/server/local/LocalMain.kt`]) {
+    const serverPath = serverPackageOf(input.packageName).replace(/\./g, '/');
+    for (const rel of [`server/src/main/kotlin/${serverPath}`, `server/src/local/kotlin/${serverPath}/local/LocalMain.kt`]) {
         if (!(await exists(rel))) problems.add(`${rel}: missing although backend is on`);
     }
     // A package that spells the template's own (io.cmpose.backendtemplate.x) is the user's, not residue
@@ -634,14 +632,29 @@ async function checkServerImage(projectPath, { docker = 'docker' } = {}) {
     return { status: 'PASS', detail: image };
 }
 
+const SERVER_IMAGE_ENV = 'CMPOSE_SERVER_IMAGE_CHECK';
+const NOT_REQUESTED = `not requested (set ${SERVER_IMAGE_ENV}=1)`;
+
+/** Which server image check runs, null = none. Opt-in: the option (a check function, true for the Docker check, false
+ * for none) wins; without it, CMPOSE_SERVER_IMAGE_CHECK=1 asks for the Docker check. Generation for an end user never
+ * pays minutes for an image or loses a valid project to the network. */
+function resolveServerImageCheck(option, env = process.env) {
+    if (typeof option === 'function') return option;
+    if (option === true) return checkServerImage;
+    if (option === false) return null;
+    return env[SERVER_IMAGE_ENV] === '1' ? checkServerImage : null;
+}
+
 // The server image builds (the backend template's own gate does not build it with the app's server package); skipped
-// without Docker
+// without Docker, and unless asked for
 async function verifyServerImage(projectPath, serverImageCheck, problems) {
-    const { status, detail } = await serverImageCheck(projectPath);
+    const { status, detail } = serverImageCheck
+        ? await serverImageCheck(projectPath)
+        : { status: 'SKIP', detail: NOT_REQUESTED };
     if (status === 'FAIL') {
         problems.add(`server/deploy/Dockerfile: the server image does not build (docker build -f server/deploy/Dockerfile server): ${detail}`);
     } else {
-        log.info(`${status === 'PASS' ? '✅' : '⏭️'} Server image: ${status}${status === 'SKIP' && detail ? ` (${detail})` : ''}`);
+        log.info(`${status === 'PASS' ? '✅' : '⏭️'} server image: ${status}${status === 'SKIP' && detail ? ` (${detail})` : ''}`);
     }
 }
 
@@ -649,10 +662,11 @@ async function verifyServerImage(projectPath, serverImageCheck, problems) {
  * Checks the generated project right before it is zipped; throws if anything is wrong (the request fails).
  * @param {string} projectPath
  * @param {{ projectName: string, appName: string, packageName: string, templateType: string, features: string[], featuresConfig?: object | null }} input
- * @param {{ serverImageCheck?: (projectPath: string) => Promise<{ status: 'PASS' | 'SKIP' | 'FAIL', detail?: string }> }} [options]
- *   the server image check (backend on), run last and only when nothing else failed; default: Docker, SKIP without it
+ * @param {{ serverImageCheck?: boolean | ((projectPath: string) => Promise<{ status: 'PASS' | 'SKIP' | 'FAIL', detail?: string }>),
+ *   env?: object }} [options] the server image check (backend on; resolveServerImageCheck: opt-in, the option or
+ *   CMPOSE_SERVER_IMAGE_CHECK=1 in env), run last and only when nothing else failed
  */
-async function verifyGeneratedProject(projectPath, input, { serverImageCheck = checkServerImage } = {}) {
+async function verifyGeneratedProject(projectPath, input, { serverImageCheck, env = process.env } = {}) {
     const packagePath = input.packageName.replace(/\./g, '/');
     const problems = new Set();
 
@@ -764,7 +778,7 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck = c
 
     // 16. The server image, last: it takes minutes, so only a project that passed everything else is built
     const backendOn = input.templateType === 'blank' && (input.featuresConfig || {}).backend === true;
-    if (backendOn && problems.size === 0) await verifyServerImage(projectPath, serverImageCheck, problems);
+    if (backendOn && problems.size === 0) await verifyServerImage(projectPath, resolveServerImageCheck(serverImageCheck, env), problems);
 
     if (problems.size > 0) {
         // Cap the message: a badly broken generation (many unwired modules) can produce dozens of
@@ -778,4 +792,4 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck = c
     }
 }
 
-module.exports = { verifyGeneratedProject, verifyBackend, verifyAppVersion, checkServerImage };
+module.exports = { verifyGeneratedProject, verifyBackend, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };
