@@ -14,6 +14,11 @@ function describeBackend() {
                 type: S.options.sharing.type,
                 default: S.options.sharing.default,
                 description: 'Spaces shared between users, with roles (viewer, editor, owner) and invitations. Off: every row belongs to one user.'
+            },
+            sample: {
+                type: S.options.sample.type,
+                default: S.options.sample.default,
+                description: 'Include the sample items feature (feature/sample) as the shape to copy'
             }
         },
         appNameRules: {
@@ -33,7 +38,7 @@ function describeBackend() {
                 'src/main/kotlin/<package>/auth': 'token verification and requireUser()',
                 'src/main/kotlin/<package>/users': 'GET and DELETE /api/v1/me',
                 'src/main/kotlin/<package>/files': 'uploads and downloads',
-                'src/main/kotlin/<package>/feature/sample': 'the sample feature (/api/v1/items): the shape to copy',
+                'src/main/kotlin/<package>/feature/sample': 'the sample feature (/api/v1/items): the shape to copy (sample only)',
                 'src/main/kotlin/<package>/sharing': 'spaces, roles and invitations (sharing only)',
                 'src/main/kotlin/<package>/openapi': 'the API description, served at /api/v1/openapi.json',
                 'src/main/resources/db/migration': 'Flyway migrations (V<n>__<name>.sql)',
@@ -51,7 +56,8 @@ function describeBackend() {
                 'then uses the returned membership.spaceId.',
             notFoundRule: 'A row the caller may not see (another user\'s, or with sharing a space where the caller is not a member or has too low a role) ' +
                 'answers 404 NOT_FOUND exactly like a missing row: never 403. Every query filters by the owner (owner_id, or space_id with sharing) in the same query.',
-            newFeature: 'Put a new feature under src/main/kotlin/<package>/feature/<name>/ copying feature/sample (table, repository, routes, DTOs), ' +
+            newFeature: 'Put a new feature under src/main/kotlin/<package>/feature/<name>/ (table, repository, routes, DTOs) ' +
+                'copying feature/sample when present, otherwise the shape of files/; ' +
                 'add a new migration V<n>__<name>.sql (never edit one that has run), its tests (IDOR and validation included) and its routes in openapi/OpenApiSpec.kt.',
             newTable: 'Every new table points at its owner with REFERENCES users(id) ON DELETE CASCADE (with sharing: spaces(id) ON DELETE CASCADE), ' +
                 'so account deletion removes its rows.',

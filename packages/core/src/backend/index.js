@@ -1,7 +1,7 @@
 'use strict';
 const { validateBackend } = require('./validate');
 const { BACKEND_SCHEMA, backendContractVersion } = require('./contract');
-const { applySharingOption, resolveContent } = require('./options');
+const { applyMarkerOption, applySharingOption, applySampleOption, removeResolverTools, resolveContent } = require('./options');
 const { applyBackendIdentity } = require('./identity');
 const { verifyBackendProject } = require('./verifier');
 const { RECORD_PATH, buildBackendRecord, writeBackendRecord } = require('./record');
@@ -12,7 +12,10 @@ module.exports = {
     validateBackend,
     BACKEND_SCHEMA,
     backendContractVersion,
+    applyMarkerOption,
     applySharingOption,
+    applySampleOption,
+    removeResolverTools,
     resolveContent,
     applyBackendIdentity,
     verifyBackendProject,

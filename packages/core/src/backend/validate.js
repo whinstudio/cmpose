@@ -22,10 +22,10 @@ function databaseNameProblem(appName) {
     return null;
 }
 
-// Every problem as { field, message }; the value holds only the known fields (sharing defaults to false)
+// Every problem as { field, message }; the value holds only the known fields (sharing defaults to false, sample to true)
 function validateBackend(input) {
     if (!isObject(input)) return { ok: false, errors: [{ field: 'input', message: 'input must be an object' }] };
-    const { projectName, appName, packageName, outputDir, sharing, templateRef } = input;
+    const { projectName, appName, packageName, outputDir, sharing, sample, templateRef } = input;
     const errors = [];
     const fail = (field, message) => errors.push({ field, message });
 
@@ -50,13 +50,18 @@ function validateBackend(input) {
     if (typeof outputDir !== 'string' || !path.isAbsolute(outputDir)) fail('outputDir', 'outputDir must be an absolute path');
 
     if (sharing !== undefined && typeof sharing !== 'boolean') fail('sharing', 'sharing must be true or false');
+    if (sample !== undefined && typeof sample !== 'boolean') fail('sample', 'sample must be true or false');
 
     if (templateRef !== undefined && (typeof templateRef !== 'string' || !REF_RE.test(templateRef) || templateRef.startsWith('.'))) {
         fail('templateRef', 'templateRef must be a tag or branch name (letters, digits, ., _ or -, not starting with .)');
     }
 
     if (errors.length) return { ok: false, errors };
-    const value = { projectName, appName, packageName, outputDir, sharing: sharing === undefined ? S.options.sharing.default : sharing };
+    const value = {
+        projectName, appName, packageName, outputDir,
+        sharing: sharing === undefined ? S.options.sharing.default : sharing,
+        sample: sample === undefined ? S.options.sample.default : sample
+    };
     if (templateRef !== undefined) value.templateRef = templateRef;
     return { ok: true, value };
 }

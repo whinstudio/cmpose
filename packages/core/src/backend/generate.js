@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const { log } = require('../log');
 const { COMMIT_FILE_NAME, REF_FILE_NAME } = require('../templateVersions');
-const { applySharingOption } = require('./options');
+const { applySharingOption, applySampleOption, removeResolverTools } = require('./options');
 const { applyBackendIdentity } = require('./identity');
 const { writeBackendRecord } = require('./record');
 const { verifyBackendProject } = require('./verifier');
@@ -18,9 +18,13 @@ async function generateBackend(value, { projectDir, templateRef = null, template
     const ref = templateRef || (await readMarker(REF_FILE_NAME));
     const commit = templateCommit || (await readMarker(COMMIT_FILE_NAME));
 
-    // 1. options, before the package moves (tools/sharing-paths.txt names the template's package dir)
+    // 1. options, sharing then sample (the template gate's order), before the package moves (tools/<option>-paths.txt
+    // names the template's package dir); then the resolver's own tools go
     await applySharingOption(projectDir, value.sharing);
     log.info(`✅ Sharing ${value.sharing ? 'on' : 'off'}`);
+    await applySampleOption(projectDir, value.sample);
+    log.info(`✅ Sample ${value.sample ? 'on' : 'off'}`);
+    await removeResolverTools(projectDir);
 
     // 2. identity
     await applyBackendIdentity(projectDir, value);
@@ -33,7 +37,7 @@ async function generateBackend(value, { projectDir, templateRef = null, template
     // 4. a broken project is never returned
     const problems = await verifyBackendProject(projectDir, value);
     if (problems.length) throw new Error(`backend verification failed: ${problems.join('; ')}`);
-    return { sharing: value.sharing, record };
+    return { sharing: value.sharing, sample: value.sample, record };
 }
 
 module.exports = { generateBackend };

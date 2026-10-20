@@ -19,18 +19,19 @@ function valueOf(request) {
     return value;
 }
 
-for (const sharing of [false, true]) {
-    test(`sharing ${sharing ? 'on' : 'off'}: a clean project with its record`, async (t) => {
+for (const [sharing, sample] of [[false, true], [true, true], [true, false], [false, false]]) {
+    test(`sharing ${sharing ? 'on' : 'off'}, sample ${sample ? 'on' : 'off'}: a clean project with its record`, async (t) => {
         const projectDir = await fixtureCopy(t);
         await fs.writeFile(path.join(projectDir, '.template-ref'), 'backend-template-test\n');
         await fs.writeFile(path.join(projectDir, '.template-commit'), 'abc1234\n');
         await fs.ensureDir(path.join(projectDir, '.git'));
-        const value = valueOf({ sharing });
+        const value = valueOf({ sharing, sample });
         const now = new Date('2026-10-17T12:00:00Z');
         const result = await generateBackend(value, { projectDir, generatorVersion: 'test', now });
 
         assert.deepEqual(await verifyBackendProject(projectDir, value), []);
-        for (const gone of ['.git', '.template-ref', '.template-commit', 'tools/gate.sh', 'tools/sharing-paths.txt', 'tools/resolve-markers.sh',
+        for (const gone of ['.git', '.template-ref', '.template-commit', 'tools/gate.sh', 'tools/sharing-paths.txt', 'tools/sample-paths.txt',
+            'tools/resolve-markers.sh',
             'tools/resolve-markers.test.sh', 'tools/TEMPLATE.md']) {
             assert.equal(await exists(projectDir, gone), false, gone);
         }
@@ -39,6 +40,10 @@ for (const sharing of [false, true]) {
         assert.ok(await isExecutable(projectDir, 'gradlew'));
         assert.equal(await exists(projectDir, 'src/main/kotlin/com/example/myapp/sharing'), sharing);
         assert.equal(await exists(projectDir, 'src/main/resources/db/migration/V2__sharing.sql'), sharing);
+        assert.equal(await exists(projectDir, 'src/main/kotlin/com/example/myapp/feature/sample'), sample);
+        assert.equal(await exists(projectDir, 'src/main/resources/db/migration/V3__sample.sql'), sample);
+        assert.equal(await exists(projectDir, 'src/test/kotlin/com/example/myapp/ItemRoutesTest.kt'), sample);
+        assert.deepEqual({ sharing: result.sharing, sample: result.sample }, { sharing, sample });
 
         const record = JSON.parse(await read(projectDir, '.cmpose/generation.json'));
         assert.deepEqual(record, {
@@ -48,6 +53,7 @@ for (const sharing of [false, true]) {
             kind: 'backend',
             contractVersion: backendContractVersion(),
             sharing,
+            sample,
             template: { repo: pins.backend.repo, ref: 'backend-template-test', commit: 'abc1234' },
             generatedAt: '2026-10-17T12:00:00.000Z'
         });
@@ -71,6 +77,23 @@ test('a project that fails verification throws', async (t) => {
     await fs.appendFile(path.join(projectDir, 'README.md'), '\nInvite a friend.\n');
     await assert.rejects(generateBackend(valueOf({ sharing: false }), { projectDir }),
         /^Error: backend verification failed: sharing word in README\.md \(sharing is off\)$/);
+});
+
+test('recordCarriesSample', async (t) => {
+    assert.equal(buildBackendRecord(valueOf({}), {}).sample, true);
+    assert.equal(buildBackendRecord(valueOf({ sample: false }), {}).sample, false);
+    const projectDir = await fixtureCopy(t);
+    const { record } = await generateBackend(valueOf({ sample: false }), { projectDir });
+    assert.equal(record.sample, false);
+    assert.equal(JSON.parse(await read(projectDir, '.cmpose/generation.json')).sample, false);
+});
+
+test('a sample leftover fails verification when sample is off', async (t) => {
+    const projectDir = await fixtureCopy(t);
+    // a sample word outside the markers survives the off variant
+    await fs.appendFile(path.join(projectDir, 'README.md'), '\nTry GET /items.\n');
+    await assert.rejects(generateBackend(valueOf({ sample: false }), { projectDir }),
+        /^Error: backend verification failed: sample word in README\.md \(sample is off\)$/);
 });
 
 test('the record holds only known options', () => {

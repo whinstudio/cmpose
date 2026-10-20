@@ -129,6 +129,7 @@ function createServer({ cacheDir, remoteUrl, backendTemplateDir = process.env.CM
             packageName: z.string().describe('Reverse-domain Kotlin package (e.g. com.example.notes)'),
             outputDir: z.string().describe('Absolute path of the folder to create the project in'),
             sharing: z.boolean().optional().describe('Spaces shared between users with roles and invitations (default false)'),
+            sample: z.boolean().optional().describe('Include the sample items feature (default true)'),
             templateRef: z.string().optional().describe('Override the pinned backend template tag')
         }
     }, async (args, extra) => runBackendGenerate(args, {

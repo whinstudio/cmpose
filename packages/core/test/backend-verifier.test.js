@@ -101,6 +101,38 @@ test('the project\'s own names are no sharing words', async (t) => {
     assert.deepEqual(await verifyBackendProject(dir, opts), []);
 });
 
+test('sampleOffLeftoverIsAProblem', async (t) => {
+    const leftovers = {
+        'src/main/kotlin/com/example/myapp/Routing.kt': 'import com.example.myapp.feature.sample.Things\n',
+        'src/main/kotlin/com/example/myapp/openapi/Spec.kt': 'val path = "/api/v1/items"\n',
+        'src/test/kotlin/com/example/myapp/T.kt': 'val repo = ItemRepository()\n',
+        'README.md': '# My App\nSee ItemDto.\n',
+        'SECURITY-CHECKLIST.md': 'ItemOpenApi\n',
+        'deploy/README.md': 'Runs V3__sample first.\n'
+    };
+    const dir = await cleanDir(t, {
+        ...leftovers,
+        // a sample dir and migration count by their names
+        'src/main/kotlin/com/example/myapp/feature/sample/Things.kt': 'class Things\n',
+        'src/main/resources/db/migration/V3__sample.sql': 'CREATE TABLE things (id UUID);\n'
+    });
+    const off = { ...OPTS, sharing: true, sample: false };
+    assert.deepEqual(await verifyBackendProject(dir, off), [
+        'sample dir src/main/kotlin/com/example/myapp/feature/sample left (sample is off)',
+        'sample migration src/main/resources/db/migration/V3__sample.sql left (sample is off)',
+        ...Object.keys(leftovers).sort().map((rel) => `sample word in ${rel} (sample is off)`)
+    ].sort());
+    // with sample on, or not given, none of it is a problem
+    assert.deepEqual(await verifyBackendProject(dir, { ...OPTS, sharing: true, sample: true }), []);
+    assert.deepEqual(await verifyBackendProject(dir, { ...OPTS, sharing: true }), []);
+    // outside src, the docs and deploy, and in other spellings (items, itemRoutes), a word is no problem
+    const clean = await cleanDir(t, {
+        'build.gradle.kts': '// feature/sample /items\n',
+        'src/main/kotlin/com/example/myapp/A.kt': 'val items = itemRoutes()\nCREATE TABLE items\n'
+    });
+    assert.deepEqual(await verifyBackendProject(clean, off), []);
+});
+
 test('a secret in any file is found', async (t) => {
     const secrets = {
         // spelled in two parts, so the repo's own privacy scan does not take the test for a key
