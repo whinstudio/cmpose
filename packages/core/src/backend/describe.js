@@ -72,8 +72,8 @@ function describeBackend({ sharing } = {}) {
             newFeature: 'Put a new feature under src/main/kotlin/<package>/feature/<name>/ (table, repository, routes, DTOs) ' +
                 'copying feature/sample when present, otherwise the shape of files/; ' +
                 'add a new migration V<n>__<name>.sql (never edit one that has run), its tests (IDOR and validation included) and its routes in openapi/OpenApiSpec.kt. ' +
-                'A list that can grow pages with limit and an opaque cursor (as GET /api/v1/items); a small list with a fixed upper bound may answer in one array ' +
-                '(as GET /api/v1/items/recent); never an unbounded list.',
+                'A list that can grow pages with limit and an opaque cursor (as the sample\'s GET /api/v1/items, when the sample feature is present); ' +
+                'a small list with a fixed upper bound may answer in one array (as the sample\'s GET /api/v1/items/recent); never an unbounded list.',
             newTable: 'Every new table points at its owner with REFERENCES users(id) ON DELETE CASCADE (with sharing: spaces(id) ON DELETE CASCADE), ' +
                 'so account deletion removes its rows.',
             securityChecklist: 'Go through SECURITY-CHECKLIST.md for every new route or table: authorization, owner filter, validation at the boundary, ' +

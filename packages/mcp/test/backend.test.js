@@ -252,8 +252,8 @@ test('backend_describe returns the contract version, the pin and the conventions
         type: 'boolean', default: true, description: 'Include the sample items feature (feature/sample) as the shape to copy'
     });
     assert.match(facts.conventions.newFeature, /copying feature\/sample when present, otherwise the shape of files\//);
-    assert.match(facts.conventions.newFeature, /pages with limit and an opaque cursor \(as GET \/api\/v1\/items\)/);
-    assert.match(facts.conventions.newFeature, /fixed upper bound may answer in one array \(as GET \/api\/v1\/items\/recent\)/);
+    assert.match(facts.conventions.newFeature, /pages with limit and an opaque cursor \(as the sample's GET \/api\/v1\/items, when the sample feature is present\)/);
+    assert.match(facts.conventions.newFeature, /fixed upper bound may answer in one array \(as the sample's GET \/api\/v1\/items\/recent\)/);
     assert.deepStrictEqual(facts.appNameRules.reserved, ['api', 'health', 'admin', 'static']);
     const conventions = JSON.stringify(facts.conventions);
     for (const rule of ['requireUser()', 'requireRole(', '404', 'feature/<name>/', 'feature/sample', 'ON DELETE CASCADE',
