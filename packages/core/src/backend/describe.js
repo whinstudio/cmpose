@@ -25,7 +25,8 @@ function describeBackend({ sharing } = {}) {
             sharing: {
                 type: S.options.sharing.type,
                 default: S.options.sharing.default,
-                description: 'Spaces shared between users, with roles (viewer, editor, owner) and invitations. Off: every row belongs to one user.'
+                description: 'Spaces shared between users, with roles (viewer, editor, owner) and invitations (an owner lists and revokes pending ones). ' +
+                    'Off: every row belongs to one user.'
             },
             sample: {
                 type: S.options.sample.type,

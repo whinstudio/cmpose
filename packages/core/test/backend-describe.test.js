@@ -21,6 +21,11 @@ test('conventions.quotas without sharing names only the storage quota', () => {
     assert.doesNotMatch(quotas, /space|member|invite/i);
 });
 
+test('the sharing option mentions invitations and their revocation', () => {
+    const { description } = describeBackend().options.sharing;
+    assert.match(description, /invitations \(an owner lists and revokes pending ones\)/);
+});
+
 test('conventions keep the 404 rule (never 403)', () => {
     for (const sharing of [undefined, false, true]) {
         assert.match(describeBackend({ sharing }).conventions.notFoundRule, /404 NOT_FOUND exactly like a missing row: never 403/);
