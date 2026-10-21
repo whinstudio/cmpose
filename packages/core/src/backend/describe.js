@@ -51,7 +51,7 @@ function describeBackend({ sharing } = {}) {
                 'src/main/kotlin/<package>/auth': 'token verification and requireUser()',
                 'src/main/kotlin/<package>/users': 'GET and DELETE /api/v1/me, PUT /api/v1/me/profile',
                 'src/main/kotlin/<package>/files': 'uploads and downloads',
-                'src/main/kotlin/<package>/feature/sample': 'the sample feature (/api/v1/items): the shape to copy (sample only)',
+                'src/main/kotlin/<package>/feature/sample': 'the sample feature (/api/v1/items paged, /api/v1/items/recent one bounded array): the shape to copy (sample only)',
                 'src/main/kotlin/<package>/sharing': 'spaces, roles and invitations (sharing only)',
                 'src/main/kotlin/<package>/openapi': 'the API description, served at /api/v1/openapi.json',
                 'src/main/resources/db/migration': 'Flyway migrations (V<n>__<name>.sql)',
@@ -71,7 +71,9 @@ function describeBackend({ sharing } = {}) {
                 'answers 404 NOT_FOUND exactly like a missing row: never 403. Every query filters by the owner (owner_id, or space_id with sharing) in the same query.',
             newFeature: 'Put a new feature under src/main/kotlin/<package>/feature/<name>/ (table, repository, routes, DTOs) ' +
                 'copying feature/sample when present, otherwise the shape of files/; ' +
-                'add a new migration V<n>__<name>.sql (never edit one that has run), its tests (IDOR and validation included) and its routes in openapi/OpenApiSpec.kt.',
+                'add a new migration V<n>__<name>.sql (never edit one that has run), its tests (IDOR and validation included) and its routes in openapi/OpenApiSpec.kt. ' +
+                'A list that can grow pages with limit and an opaque cursor (as the sample\'s GET /api/v1/items, when the sample feature is present); ' +
+                'a small list with a fixed upper bound may answer in one array (as the sample\'s GET /api/v1/items/recent); never an unbounded list.',
             newTable: 'Every new table points at its owner with REFERENCES users(id) ON DELETE CASCADE (with sharing: spaces(id) ON DELETE CASCADE), ' +
                 'so account deletion removes its rows.',
             securityChecklist: 'Go through SECURITY-CHECKLIST.md for every new route or table: authorization, owner filter, validation at the boundary, ' +
