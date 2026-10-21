@@ -33,8 +33,8 @@ test('renames only the Sample localization keys, not C# members named sample', a
     const cs = await read(d, 'Assets/_Project/Features/Shop/Ads/ShopAdsPresenter.cs');
     assert.match(cs, /"shop\.title"/);
     assert.match(cs, /private readonly IShopView sample;/);
-    assert.match(cs, / sample\.CompleteClicked \+= OnComplete;/);
-    assert.ok(!cs.includes('shop.CompleteClicked'));
+    assert.match(cs, / sample\.ShowCompleted\(count\.Value\);/);
+    assert.ok(!cs.includes('shop.ShowCompleted'));
     assert.match(await read(d, 'Assets/_Project/Features/Shop/Ads/Bonus.prefab'), /^ {2}key: shop\.back$/m);
 });
 

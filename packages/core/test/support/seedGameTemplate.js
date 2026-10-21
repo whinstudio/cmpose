@@ -322,12 +322,18 @@ async function seedGameTemplate(dir, { full = false, legacyCi = false, themes = 
         asmdef('Kturker.UnityBase.Features.Sample.Installer', ['Kturker.UnityBase.Features.Sample.Ads', 'VContainer']));
     await folder(`${S}/Ads`, GUIDS.ads);
     await asset(`${S}/Ads/SampleAdsPresenter.cs`, GUIDS.adsPresenter, ns('Kturker.UnityBase.Features.Sample.Ads',
-        ['    public sealed class SampleAdsPresenter',
+        ['    public sealed class SampleAdsPresenter : Presenter<IBonusView>',
             '    {',
             '        public const string TitleKey = "sample.title";',
             '        public static readonly SaveSchema<int> Schema = new SaveSchema<int>("sample", 1);',
             '        private readonly ISampleView sample;',
-            '        public void Start() => sample.CompleteClicked += OnComplete;',
+            '        private readonly ICompletionCounter counter;',
+            '        public override void Start() => View.BonusClicked += OnBonus;',
+            '        private void Rewarded()',
+            '        {',
+            '            var count = counter.Record();',
+            '            if (count.HasValue) sample.ShowCompleted(count.Value);',
+            '        }',
             '    }', ''].join('\n')));
     await asset(`${S}/Ads/BonusView.cs`, GUIDS.bonusView, ns('Kturker.UnityBase.Features.Sample.Ads',
         '    public sealed class BonusView : UnityEngine.MonoBehaviour { }\n'));
