@@ -223,6 +223,21 @@ test('backend_generate refuses a local git checkout without tracked files', asyn
     assert.deepStrictEqual(await leftovers(outputDir), []);
 });
 
+test('backend_generate refuses a bare repository and a .git directory as the local checkout', async (t) => {
+    const { template, outputDir, run } = await setup(t);
+    gitCheckout(template);
+    const bare = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-backend-bare-'));
+    t.after(() => fs.remove(bare));
+    execFileSync('git', ['-C', bare, 'init', '-q', '--bare'], { stdio: 'pipe' });
+    for (const templateDir of [bare, path.join(template, '.git')]) {
+        const r = await run({ templateRef: undefined }, { templateDir });
+        assert.strictEqual(r.isError, true, templateDir);
+        assert.match(textOf(r), /The local template checkout \(CMPOSE_BACKEND_TEMPLATE_DIR\) has no tracked files\./);
+        assert.strictEqual(await exists(outputDir, 'NotesBackend'), false);
+        assert.deepStrictEqual(await leftovers(outputDir), []);
+    }
+});
+
 test('backend_generate refuses a local template path that is not a directory', async (t) => {
     const { run } = await setup(t);
     const r = await run({}, { templateDir: 'relative/template' });

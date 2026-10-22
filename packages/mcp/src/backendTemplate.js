@@ -20,15 +20,16 @@ async function copyLocalTemplate(dir, dest) {
     try {
         copy = await copyTrackedFiles(dir, dest);
     } catch (err) {
-        if (err instanceof NotACheckoutError) {
-            if (err.cause?.code === 'ENOENT' && (await fs.pathExists(path.join(dir, '.git')))) {
+        // without a cause git ran and answered "not a work tree" (a bare repository or a .git directory): never copied
+        if (err instanceof NotACheckoutError && err.cause) {
+            if (err.cause.code === 'ENOENT' && (await fs.pathExists(path.join(dir, '.git')))) {
                 throw new TypeError('git is needed to copy the local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR).');
             }
             const filter = (src) => !isSecretName(path.basename(src)) && (path.dirname(src) !== dir || !LOCAL_SKIP.has(path.basename(src)));
             await fs.copy(dir, dest, { filter });
             return [];
         }
-        if (err instanceof TypeError && err.message === 'no tracked files') {
+        if (err instanceof NotACheckoutError || (err instanceof TypeError && err.message === 'no tracked files')) {
             throw new TypeError('The local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR) has no tracked files.');
         }
         throw err;

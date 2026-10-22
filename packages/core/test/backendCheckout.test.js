@@ -88,6 +88,26 @@ test('a plain directory is a NotACheckoutError', async (t) => {
     assert.deepEqual(await fs.readdir(dest), []);
 });
 
+test('a bare repository and a .git directory are a NotACheckoutError without a cause', async (t) => {
+    const { dir } = await checkout(t, { 'README.md': 'readme\n' });
+    const bare = await tmpDir(t, 'cmpose-bare-');
+    execFileSync('git', ['-C', bare, 'init', '-q', '--bare']);
+    for (const src of [bare, path.join(dir, '.git')]) {
+        const dest = await tmpDir(t, 'cmpose-dest-');
+        await assert.rejects(copyTrackedFiles(src, dest), (err) => err instanceof NotACheckoutError && err.cause === undefined);
+        assert.deepEqual(await fs.readdir(dest), [], src);
+    }
+});
+
+test('a checkout with staged files and no commit yet has no commit', async (t) => {
+    const dir = await tmpDir(t, 'cmpose-staged-');
+    await fs.outputFile(path.join(dir, 'README.md'), 'readme\n');
+    execFileSync('git', ['-C', dir, 'init', '-q']);
+    execFileSync('git', ['-C', dir, 'add', 'README.md']);
+    const dest = await tmpDir(t, 'cmpose-dest-');
+    assert.deepEqual(await copyTrackedFiles(dir, dest), { commit: null, copied: 1, dirty: true });
+});
+
 test('a checkout that tracks only local working files has no tracked files', async (t) => {
     const { dir } = await checkout(t, { 'build/x': 'x\n' });
     const dest = await tmpDir(t, 'cmpose-dest-');
