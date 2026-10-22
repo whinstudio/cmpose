@@ -1,6 +1,6 @@
 'use strict';
 // Copies a local backend template checkout: only git's tracked files, as the working tree holds them
-// (used by @cmpose/mcp for CMPOSE_BACKEND_TEMPLATE_DIR and by the release tools)
+// (used by @cmpose/mcp for CMPOSE_BACKEND_TEMPLATE_DIR)
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
