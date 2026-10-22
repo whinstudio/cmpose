@@ -10,12 +10,12 @@
     "id": "1418016719",
     "subfolder": "packages/mcp"
   },
-  "version": "0.8.3",
+  "version": "0.8.4",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@cmpose/mcp",
-      "version": "0.8.3",
+      "version": "0.8.4",
       "transport": { "type": "stdio" }
     }
   ]
