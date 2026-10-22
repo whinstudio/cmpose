@@ -7,7 +7,7 @@ const fs = require('fs-extra');
 const { renderRequirements, renderModules, replaceBetweenMarkers, removeMarkedBlock, fillReadme } = require('../src/readmeService');
 const { setLogger } = require('../src/log');
 
-const VERSIONS = { jdk: '21', kotlin: '2.3.21', composeMultiplatform: '1.11.1', agp: '9.2.1', gradle: '9.4.1', compileSdk: '36', targetSdk: '36' };
+const VERSIONS = { jdk: '21', kotlin: '2.3.21', composeMultiplatform: '1.11.1', agp: '9.2.1', gradle: '9.7.0', compileSdk: '36', targetSdk: '36' };
 
 const README = [
     'Intro',
