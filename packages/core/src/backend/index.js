@@ -7,6 +7,7 @@ const { verifyBackendProject } = require('./verifier');
 const { RECORD_PATH, buildBackendRecord, writeBackendRecord } = require('./record');
 const { generateBackend } = require('./generate');
 const { describeBackend } = require('./describe');
+const { copyTrackedFiles, LOCAL_SKIP, NotACheckoutError } = require('./checkout');
 
 module.exports = {
     validateBackend,
@@ -24,5 +25,8 @@ module.exports = {
     buildBackendRecord,
     writeBackendRecord,
     generateBackend,
-    describeBackend
+    describeBackend,
+    copyTrackedFiles,
+    LOCAL_SKIP,
+    NotACheckoutError
 };

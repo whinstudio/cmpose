@@ -2,13 +2,10 @@
 // The backend template's source for backend_generate and for cmp_generate's server/ (blank with backend):
 // a local checkout (CMPOSE_BACKEND_TEMPLATE_DIR) or the template cache at the pinned (or given) tag
 const path = require('path');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
 const fs = require('fs-extra');
 const core = require('@cmpose/core');
 
-// A local checkout's working files that a released template never holds
-const LOCAL_SKIP = new Set(['.git', '.claude', '.idea', '.gradle', '.kotlin', '.local-server', 'build', '.DS_Store']);
+const { copyTrackedFiles, LOCAL_SKIP, NotACheckoutError } = core.backend;
 const isPending = (ref) => /-PENDING$/.test(ref);
 // Secret files a checkout outside git may hold, skipped at every level (deploy/.env.example is the template's own)
 const isSecretName = (name) => name !== '.env.example' && (name === '.env' || name.endsWith('.env') || name.startsWith('.env.')
@@ -16,44 +13,28 @@ const isSecretName = (name) => name !== '.env.example' && (name === '.env' || na
     || name === 'google-services.json' || name === 'GoogleService-Info.plist');
 const LOCAL_DIRTY_WARNING = 'The local template checkout has uncommitted changes; the project holds them.';
 
-const git = (dir, args) => promisify(execFile)('git', ['-C', dir, ...args], { maxBuffer: 64 * 1024 * 1024, encoding: 'utf8' });
-
-// A git checkout's tracked files (relative paths), or null when dir is not in a git work tree
-async function trackedFiles(dir) {
-    try {
-        await git(dir, ['rev-parse', '--is-inside-work-tree']);
-    } catch (err) {
-        if (err.code === 'ENOENT' && (await fs.pathExists(path.join(dir, '.git')))) {
-            throw new TypeError('git is needed to copy the local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR).');
-        }
-        return null;
-    }
-    const { stdout } = await git(dir, ['ls-files', '-z']);
-    return stdout.split('\0').filter(Boolean);
-}
-
 // Copies a local checkout into dest: only git's tracked files, or (outside git) all but the working and secret files.
 // Returns the warnings the result carries.
 async function copyLocalTemplate(dir, dest) {
-    const tracked = await trackedFiles(dir);
-    if (!tracked) {
-        const filter = (src) => !isSecretName(path.basename(src)) && (path.dirname(src) !== dir || !LOCAL_SKIP.has(path.basename(src)));
-        await fs.copy(dir, dest, { filter });
-        return [];
+    let copy;
+    try {
+        copy = await copyTrackedFiles(dir, dest);
+    } catch (err) {
+        // without a cause git ran and answered "not a work tree" (a bare repository or a .git directory): never copied
+        if (err instanceof NotACheckoutError && err.cause) {
+            if (err.cause.code === 'ENOENT' && (await fs.pathExists(path.join(dir, '.git')))) {
+                throw new TypeError('git is needed to copy the local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR).');
+            }
+            const filter = (src) => !isSecretName(path.basename(src)) && (path.dirname(src) !== dir || !LOCAL_SKIP.has(path.basename(src)));
+            await fs.copy(dir, dest, { filter });
+            return [];
+        }
+        if (err instanceof NotACheckoutError || (err instanceof TypeError && err.message === 'no tracked files')) {
+            throw new TypeError('The local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR) has no tracked files.');
+        }
+        throw err;
     }
-    let copied = 0;
-    for (const rel of tracked) {
-        if (LOCAL_SKIP.has(rel.split('/')[0])) continue;
-        const src = path.join(dir, rel);
-        const stat = await fs.lstat(src).catch(() => null);
-        // a tracked file deleted in the work tree, or a submodule, is not copied
-        if (!stat || stat.isDirectory()) continue;
-        await fs.copy(src, path.join(dest, rel)); // keeps the mode, so the executable bits too
-        copied += 1;
-    }
-    if (!copied) throw new TypeError('The local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR) has no tracked files.');
-    const { stdout } = await git(dir, ['status', '--porcelain', '--untracked-files=no']);
-    return stdout.trim() ? [LOCAL_DIRTY_WARNING] : [];
+    return copy.dirty ? [LOCAL_DIRTY_WARNING] : [];
 }
 
 // The template source: a local checkout (templateDir / CMPOSE_BACKEND_TEMPLATE_DIR) or the template cache.
