@@ -289,3 +289,8 @@ test('backend_generate offers exactly the contract fields', async () => {
     assert.match(tool.description, /^Generate a standalone Kotlin\/Ktor backend \(Docker-ready\) on this machine\. Call backend_describe first\./);
     await close();
 });
+
+test('mcp depends on exactly the workspace core version (it needs core.backend.copyTrackedFiles)', () => {
+    assert.strictEqual(typeof core.backend.copyTrackedFiles, 'function');
+    assert.strictEqual(require('../package.json').dependencies['@cmpose/core'], require('@cmpose/core/package.json').version);
+});
