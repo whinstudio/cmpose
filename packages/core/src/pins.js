@@ -5,5 +5,5 @@ module.exports = Object.freeze({
     // The release step replaces the placeholder with the game template's tag
     game: Object.freeze({ repo: 'whinstudio/cmpose-game-template', ref: 'game-template-2026.10.22' }),
     // The release step replaces the placeholder with the backend template's tag
-    backend: Object.freeze({ repo: 'whinstudio/cmpose-backend-template', ref: 'backend-template-2026.10.22' })
+    backend: Object.freeze({ repo: 'whinstudio/cmpose-backend-template', ref: 'backend-template-2026.10.26' })
 });
