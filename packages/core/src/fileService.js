@@ -1,7 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const { listTextFiles } = require('./projectFiles');
-const { removeSwiftPackage } = require('./xcodePackages');
+const { removeSwiftPackage, removeSwiftPackageProduct, removeRunScriptPhase } = require('./xcodePackages');
 const { stripPins } = require('./backendOption');
 const { capitalize, TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('./featureModules');
 const { removeMarkedBlock } = require('./readmeService');
@@ -107,6 +107,14 @@ async function dropLines(file, predicate) {
     if (!(await fs.pathExists(file))) return;
     const content = await fs.readFile(file, 'utf8');
     await fs.writeFile(file, content.split('\n').filter((line) => !predicate(line)).join('\n'));
+}
+
+// Insights off: initKoin.kt without InsightsModule, installInsightsLogging and their imports; KoinPlatform's
+// import goes too when nothing else uses it
+function stripInsightsKoin(content) {
+    const lines = content.split('\n').filter((line) => !INSIGHTS_KOIN_LINE.test(line));
+    const withoutImport = lines.filter((line) => !KOIN_PLATFORM_IMPORT.test(line)).join('\n');
+    return /\bKoinPlatform\b/.test(withoutImport) ? lines.join('\n') : withoutImport;
 }
 
 // Ads off: the AdMob keys the template adds to iosApp/iosApp/Info.plist
@@ -1172,6 +1180,22 @@ const CORE_ROOM_ACCESSOR = /\bprojects\.core\.room(?![A-Za-z0-9])/;
 const FEATURE_NOTES_INCLUDE = /"(?::)?feature:notes(?=[:"])/;
 const FEATURE_NOTES_ACCESSOR = /\bprojects\.feature\.notes(?![A-Za-z0-9])/;
 const ROOM_PLUGIN_ALIAS = /\balias\(libs\.plugins\.room\)/;
+// Insights (core/insights: Crashlytics + Analytics), bounded the same way
+const INSIGHTS_DIR = path.join('core', 'insights');
+const CORE_INSIGHTS_INCLUDE = /"(?::)?core:insights(?=[:"])/;
+const CORE_INSIGHTS_ACCESSOR = /\bprojects\.core\.insights(?![A-Za-z0-9])/;
+// The comment above shared's export(projects.core.insights)
+const INSIGHTS_COMMENT = /^\s*\/\/.*(?:\bcore:insights\b|\bIosInsights)/;
+// initKoin.kt: the module, the log writer's installation and their imports
+const INSIGHTS_KOIN_LINE = /\bInsightsModule\b|\binstallInsightsLogging\b|^\s*import\s+[\w.]+\.core\.insights\./;
+const KOIN_PLATFORM_IMPORT = /^\s*import\s+org\.koin\.mp\.KoinPlatform\s*$/;
+// androidApp/build.gradle.kts: the Crashlytics plugin (alias and apply) and the Firebase libraries only insights uses
+const INSIGHTS_GRADLE_LINE = /\blibs\.plugins\.firebaseCrashlytics(?![A-Za-z0-9])|"com\.google\.firebase\.crashlytics"|\blibs\.firebase\.(?:bom|crashlytics|analytics)(?![A-Za-z0-9])/;
+// The firebase-ios-sdk products insights links and its symbol upload phase; the package itself is the Firebase setup
+// it shares with the backend (applyBackendOption)
+const FIREBASE_PACKAGE_URL = 'https://github.com/firebase/firebase-ios-sdk';
+const INSIGHTS_FIREBASE_PRODUCTS = ['FirebaseCrashlytics', 'FirebaseAnalytics'];
+const CRASHLYTICS_UPLOAD_PHASE = 'Upload Crashlytics symbols if configured';
 
 // The Google Mobile Ads Swift package (iosApp/iosApp.xcodeproj); the template's repositoryURL ends in
 // .git, removeSwiftPackage matches it either way
@@ -1285,10 +1309,7 @@ const BACKEND_RESIDUE_TOKENS = [
     code(/\bcore\.api(?![A-Za-z0-9_])/, 'core.api'),
     code(/\bBACKEND_CLIENT\b/, 'BACKEND_CLIENT'),
     code(/\bFirebaseAuth\b/, 'FirebaseAuth', BACKEND_IOS_EXTENSIONS),
-    code(/\bFirebaseCore\b/, 'FirebaseCore', BACKEND_IOS_EXTENSIONS),
     code(/\bGoogleSignIn\b/, 'GoogleSignIn', BACKEND_IOS_EXTENSIONS),
-    code(/\bgoogle-services\b/, 'google-services'),
-    code(/\bgoogleServices\b/, 'googleServices'),
     code(/\bLOCAL_SERVER\b/, 'LOCAL_SERVER', BACKEND_IOS_EXTENSIONS),
     code(/^\s*#if LOCAL_SERVER\b/m, 'LOCAL_SERVER', PLIST),
     code(/com\.apple\.developer\.applesignin/, 'applesignin', new Set([...BACKEND_IOS_EXTENSIONS, '.plist'])),
@@ -1298,8 +1319,43 @@ const BACKEND_RESIDUE_TOKENS = [
     // writePrivacyManifest's, after this check
     code(/cmpose:backend/, 'cmpose:backend', new Set([...BACKEND_IOS_EXTENSIONS, '.xcconfig', '.plist', '.xml', '.md']))
 ];
+// The Firebase setup the backend shares with insights (cmpose:firebase): looked for only when both are off
+const FIREBASE_RESIDUE_TOKENS = [
+    code(/\bFirebaseCore\b/, 'FirebaseCore', BACKEND_IOS_EXTENSIONS),
+    code(/\bgoogle-services\b/, 'google-services'),
+    code(/\bgoogleServices\b/, 'googleServices')
+];
+// The residue tokens for backend off: the Firebase setup's too unless insights keeps it
+const backendResidueTokens = (config) => (config.insights === true
+    ? BACKEND_RESIDUE_TOKENS : [...BACKEND_RESIDUE_TOKENS, ...FIREBASE_RESIDUE_TOKENS]);
 const BACKEND_RESIDUE_FILES = () => ['server', path.join('core', 'api'), path.join('core', 'auth'),
     path.join('feature', 'account'), path.join('feature', 'sharing')];
+
+// Insights off: the tokens core/insights and its wiring must leave nowhere (bounded and looked for like the backend's)
+const insightsClass = (name) => ({ ...classToken(name, new RegExp(`\\b${name}\\b`)), extensions: BACKEND_CODE_EXTENSIONS });
+const INSIGHTS_RESIDUE_TOKENS = [
+    code(CORE_INSIGHTS_INCLUDE, '":core:insights"'),
+    code(CORE_INSIGHTS_ACCESSOR, 'projects.core.insights'),
+    code(/\bcore\.insights(?![A-Za-z0-9_])/, 'core.insights'),
+    code(/\blibs\.plugins\.firebaseCrashlytics(?![A-Za-z0-9])/, 'libs.plugins.firebaseCrashlytics'),
+    code(/\blibs\.firebase\.(?:bom|crashlytics|analytics)(?![A-Za-z0-9])/, 'libs.firebase'),
+    code(/\bcom\.google\.firebase:firebase-(?:bom|crashlytics|analytics)(?![A-Za-z0-9-])/, 'com.google.firebase:firebase'),
+    code(/\bcom\.google\.firebase\.crashlytics(?![A-Za-z0-9_])/, 'com.google.firebase.crashlytics'),
+    // CrashKiOS (readable Kotlin crashes on iOS): its imports and the catalog entry core/insights' iosMain uses
+    code(/\bco\.touchlab\.crashkios(?![A-Za-z0-9_])/, 'co.touchlab.crashkios'),
+    code(/\blibs\.crashkios(?![A-Za-z0-9_])/, 'libs.crashkios'),
+    code(/\bFirebaseCrashlytics\b/, 'FirebaseCrashlytics', BACKEND_IOS_EXTENSIONS),
+    code(/\bFirebaseAnalytics\b/, 'FirebaseAnalytics', BACKEND_IOS_EXTENSIONS),
+    code(/Upload Crashlytics symbols/, 'Upload Crashlytics symbols', PBXPROJ),
+    code(/cmpose:insights/, 'cmpose:insights', new Set([...BACKEND_IOS_EXTENSIONS, '.md'])),
+    ...['IosInsightsBridge', 'IosInsights', 'InsightsBridge', 'InsightsBridgeRegistrationKt', 'registerInsightsBridge',
+        'installInsightsLogging', 'InsightsModule', 'InsightsLogWriter'].map(insightsClass)
+];
+const INSIGHTS_RESIDUE_FILES = (packagePath) => [
+    INSIGHTS_DIR,
+    path.join('shared', 'src', 'iosMain', 'kotlin', packagePath, 'InsightsBridgeRegistration.kt'),
+    path.join('iosApp', 'iosApp', 'InsightsBridge.swift')
+];
 
 // Whether a MONETIZATION_RESIDUE_TOKENS key is off (monetization = purchases and ads both off)
 function monetizationKeyOff(config, key) {
@@ -1402,13 +1458,24 @@ async function assertNoRoomResidue(projectPath, packageName, config) {
     });
 }
 
-// Backend off: nothing of the backend is left (see BACKEND_RESIDUE_TOKENS)
+// Backend off: nothing of the backend is left (see BACKEND_RESIDUE_TOKENS), nor of the Firebase setup
+// when insights is off too (FIREBASE_RESIDUE_TOKENS)
 async function assertNoBackendResidue(projectPath, packageName, config) {
     if (config.backend === true) return;
     await scanForResidue(projectPath, packageName, {
-        tokens: BACKEND_RESIDUE_TOKENS,
+        tokens: backendResidueTokens(config),
         files: BACKEND_RESIDUE_FILES(),
         title: 'Backend residue after removal'
+    });
+}
+
+// Insights off: nothing of core/insights is left (see INSIGHTS_RESIDUE_TOKENS)
+async function assertNoInsightsResidue(projectPath, packageName, config) {
+    if (config.insights === true) return;
+    await scanForResidue(projectPath, packageName, {
+        tokens: INSIGHTS_RESIDUE_TOKENS,
+        files: INSIGHTS_RESIDUE_FILES(packageName.replace(/\./g, '/')),
+        title: 'Insights residue after removal'
     });
 }
 
@@ -2106,6 +2173,43 @@ async function processCoreFeatures(projectPath, config, packageName) {
         log.info('✅ Removed Room');
     }
 
+    // Insights off: core/insights, its iOS bridge and every line wiring it, the Crashlytics plugin, the Firebase
+    // and CrashKiOS libraries only it uses, its firebase-ios-sdk products and the symbol upload phase. The Firebase
+    // setup it shares with the backend (cmpose:firebase, the package) is applyBackendOption's: gone with the backend
+    // off, kept with it on.
+    if (config.insights !== true) {
+        log.info('📈 Removing Insights (Crashlytics, Analytics)...');
+        const packagePath = packageName.replace(/\./g, '/');
+        await fs.remove(path.join(projectPath, INSIGHTS_DIR));
+        await dropLines(path.join(projectPath, 'settings.gradle.kts'), (line) => CORE_INSIGHTS_INCLUDE.test(line));
+        await dropLines(path.join(projectPath, 'shared', 'build.gradle.kts'),
+            (line) => CORE_INSIGHTS_ACCESSOR.test(line) || INSIGHTS_COMMENT.test(line));
+        await rewriteIfExists(path.join(projectPath, 'shared', 'src', 'commonMain', 'kotlin', packagePath, 'di', 'initKoin.kt'),
+            stripInsightsKoin);
+
+        // iOS: the Kotlin registration, the Swift bridge and its registration in iOSApp.swift
+        await fs.remove(path.join(projectPath, 'shared', 'src', 'iosMain', 'kotlin', packagePath, 'InsightsBridgeRegistration.kt'));
+        await fs.remove(path.join(projectPath, 'iosApp', 'iosApp', 'InsightsBridge.swift'));
+        await dropLines(path.join(projectPath, 'iosApp', 'iosApp', 'iOSApp.swift'), (line) => /\bregisterInsightsBridge\b/.test(line));
+
+        // Android: the Crashlytics plugin lines (the root build file too, should it declare the plugin)
+        for (const build of [['androidApp', 'build.gradle.kts'], ['build.gradle.kts']]) {
+            await dropLines(path.join(projectPath, ...build), (line) => INSIGHTS_GRADLE_LINE.test(line));
+        }
+        await rewriteIfExists(path.join(projectPath, 'gradle', 'libs.versions.toml'), (content) => removeTomlEntries(content, {
+            versions: ['firebaseBom', 'firebaseCrashlyticsPlugin', 'crashkios'],
+            libraries: ['firebase-bom', 'firebase-crashlytics', 'firebase-analytics', 'crashkios-crashlytics'],
+            plugins: ['firebaseCrashlytics']
+        }));
+
+        // Xcode: the Crashlytics and Analytics products (FirebaseAuth stays with the backend) and the upload phase
+        await rewriteIfExists(path.join(projectPath, 'iosApp', 'iosApp.xcodeproj', 'project.pbxproj'), (content) => removeRunScriptPhase(
+            INSIGHTS_FIREBASE_PRODUCTS.reduce((text, product) => removeSwiftPackageProduct(text, FIREBASE_PACKAGE_URL, product), content),
+            CRASHLYTICS_UPLOAD_PHASE
+        ));
+        log.info('✅ Removed Insights');
+    }
+
     // README: a disabled flag's marked section goes (both monetization flags off: the whole
     // monetization section; room off: the whole Room section, room on: its favorites part). fillReadme runs later
     // and rewrites only the requirements/modules sections.
@@ -2121,6 +2225,7 @@ async function processCoreFeatures(projectPath, config, packageName) {
             updated = removeMarkedBlock(updated, 'cmpose:ads');
         }
         updated = removeMarkedBlock(updated, config.room === true ? 'cmpose:room-favorites' : 'cmpose:room');
+        if (config.insights !== true) updated = removeMarkedBlock(updated, 'cmpose:insights');
         if (updated !== readme) await fs.writeFile(readmePath, updated);
     }
 
@@ -2129,6 +2234,8 @@ async function processCoreFeatures(projectPath, config, packageName) {
     await assertNoMonetizationResidue(projectPath, packageName, config);
     // Room residue check, at the same point and for the same reason
     await assertNoRoomResidue(projectPath, packageName, config);
+    // Insights residue check, likewise
+    await assertNoInsightsResidue(projectPath, packageName, config);
     // Backend residue check (applyBackendOption removed it on the template package), likewise
     await assertNoBackendResidue(projectPath, packageName, config);
 
@@ -2270,8 +2377,14 @@ module.exports = {
     assertNoMonetizationResidue,
     assertNoRoomResidue,
     assertNoBackendResidue,
+    assertNoInsightsResidue,
     findResidue,
     BACKEND_RESIDUE_TOKENS,
+    FIREBASE_RESIDUE_TOKENS,
+    backendResidueTokens,
+    INSIGHTS_DIR,
+    INSIGHTS_FIREBASE_PRODUCTS,
+    INSIGHTS_RESIDUE_TOKENS,
     processCoreFeatures,
     sortImportsLikeKtlint,
     sortKotlinImports

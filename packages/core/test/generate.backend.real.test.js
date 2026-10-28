@@ -70,16 +70,23 @@ async function residue(projectDir) {
     return found;
 }
 
-async function assertBackendOff(projectDir) {
+// `firebase`: insights keeps the Firebase setup the backend shares with it (showcase, once its template has insights)
+async function assertBackendOff(projectDir, { firebase = false } = {}) {
     assert.deepEqual(await residue(projectDir), []);
     for (const dir of ['server', 'core/api', 'core/auth', 'feature/account', 'feature/sharing']) {
         assert.equal(await fs.pathExists(path.join(projectDir, dir)), false, dir);
     }
     const pbxproj = await read(projectDir, PBXPROJ);
     assert.ok(pbxproj.includes('swift-package-manager-google-mobile-ads'), 'GMA package missing from project.pbxproj');
-    assert.ok(!/firebase|GoogleSignIn/i.test(pbxproj), 'Firebase or GoogleSignIn left in project.pbxproj');
     const pins = JSON.parse(await read(projectDir, PACKAGE_RESOLVED)).pins.map((pin) => pin.identity);
-    assert.deepEqual(pins.sort(), GMA_PINS);
+    if (firebase) {
+        assert.ok(!/FirebaseAuth|GoogleSignIn/.test(pbxproj), 'FirebaseAuth or GoogleSignIn left in project.pbxproj');
+        for (const pin of GMA_PINS) assert.ok(pins.includes(pin), pin);
+        assert.ok(!pins.includes('googlesignin-ios'), 'googlesignin-ios pin left');
+    } else {
+        assert.ok(!/firebase|GoogleSignIn/i.test(pbxproj), 'Firebase or GoogleSignIn left in project.pbxproj');
+        assert.deepEqual(pins.sort(), GMA_PINS);
+    }
 }
 
 // A test the project keeps compiles only with its module's test libraries: one that answers with Ktor's MockEngine
@@ -98,9 +105,9 @@ async function testsWithoutMockClient(projectDir) {
     return missing;
 }
 
-test('real template, showcase: no backend part is left, GMA stays', OPTIONS, async (t) => {
+test('real template, showcase: no backend part is left, GMA stays (the Firebase setup too, with insights)', OPTIONS, async (t) => {
     const projectDir = await generate(t, { projectName: 'Demo', packageName: 'com.example.demo', templateType: 'showcase' });
-    await assertBackendOff(projectDir);
+    await assertBackendOff(projectDir, { firebase: await fs.pathExists(path.join(REAL, 'core', 'insights')) });
     // core/network's BaseRepositoryTest keeps its MockEngine cases without the backend
     assert.ok(await fs.pathExists(path.join(projectDir, 'core/network/src/commonTest/kotlin/com/example/demo/core/network/BaseRepositoryTest.kt')));
     assert.deepEqual(await testsWithoutMockClient(projectDir), []);

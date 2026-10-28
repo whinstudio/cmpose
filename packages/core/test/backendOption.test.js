@@ -352,3 +352,120 @@ test('applyBackendOption(false) on a tree without the backend changes nothing', 
     assert.equal(text(dir, 'iosApp/iosApp.xcodeproj/project.pbxproj'), PBXPROJ_WITHOUT_BACKEND);
     assert.equal(text(dir, 'shared/Main.kt'), 'import com.kturker.multiplatform.core.network.X\n');
 });
+
+// --- The shared Firebase setup (cmpose:firebase): kept when backend or insights is on ---
+
+const FIREBASE_SWIFT = 'import SwiftUI\n// cmpose:firebase\nimport FirebaseCore\n// /cmpose:firebase\n\ninit() {\n'
+    + '    // cmpose:firebase\n    if Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil { FirebaseApp.configure() }\n'
+    + '    // /cmpose:firebase\n    // cmpose:backend\n    registerSignInBridge()\n    // /cmpose:backend\n}\n';
+const FIREBASE_GITIGNORE = 'local.properties\n# cmpose:firebase\n\nandroidApp/google-services.json\niosApp/iosApp/GoogleService-Info.plist\n# /cmpose:firebase\n';
+const FIREBASE_TOML = '[plugins]\nkotlin = { id = "kotlin" }\n# cmpose:firebase\ngoogleServices = { id = "com.google.gms.google-services", version = "4.4.2" }\n# /cmpose:firebase\n';
+
+async function seedFirebaseProject() {
+    const dir = await seedProject();
+    await fs.outputFile(path.join(dir, 'iosApp/iosApp/iOSApp.swift'), FIREBASE_SWIFT);
+    await fs.outputFile(path.join(dir, '.gitignore'), FIREBASE_GITIGNORE);
+    await fs.outputFile(path.join(dir, 'gradle/libs.versions.toml'), FIREBASE_TOML);
+    return dir;
+}
+
+const RESOLVED = 'iosApp/iosApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved';
+
+test('backend off, insights on keeps firebase blocks and the firebase-ios-sdk package but drops GoogleSignIn and FirebaseAuth', async (t) => {
+    const dir = await seedFirebaseProject();
+    t.after(() => fs.remove(dir));
+    await applyBackendOption(dir, { enabled: false, firebase: true });
+
+    // Backend parts still go
+    for (const gone of ['server', 'core/auth', 'feature/account', 'iosApp/iosApp/SignInBridge.swift']) {
+        assert.ok(!exists(dir, gone), `${gone} is still there`);
+    }
+    const swift = text(dir, 'iosApp/iosApp/iOSApp.swift');
+    assert.ok(!/cmpose:|registerSignInBridge/.test(swift), swift);
+    assert.ok(swift.includes('import FirebaseCore\n'));
+    assert.ok(swift.includes('FirebaseApp.configure()'));
+    assert.equal(text(dir, '.gitignore'), 'local.properties\n\nandroidApp/google-services.json\niosApp/iosApp/GoogleService-Info.plist\n');
+    assert.ok(text(dir, 'gradle/libs.versions.toml').includes('googleServices = { id = "com.google.gms.google-services"'));
+    assert.ok(!text(dir, 'gradle/libs.versions.toml').includes('cmpose:'));
+
+    const pbxproj = text(dir, 'iosApp/iosApp.xcodeproj/project.pbxproj');
+    for (const kept of ['XCRemoteSwiftPackageReference "firebase-ios-sdk"', 'Copy GoogleService-Info if present', '"GoogleService-Info.plist",',
+        'swift-package-manager-google-mobile-ads']) {
+        assert.ok(pbxproj.includes(kept), `${kept} missing from project.pbxproj`);
+    }
+    for (const gone of ['GoogleSignIn', 'FirebaseAuth', 'iosApp.entitlements', 'CODE_SIGN_ENTITLEMENTS', 'INFOPLIST_PREPROCESS', 'LOCAL_SERVER']) {
+        assert.ok(!pbxproj.includes(gone), `${gone} still in project.pbxproj`);
+    }
+    const pins = JSON.parse(text(dir, RESOLVED)).pins.map((pin) => pin.identity);
+    assert.deepEqual(pins, ['firebase-ios-sdk', 'gtm-session-fetcher',
+        'swift-package-manager-google-mobile-ads', 'swift-package-manager-google-user-messaging-platform']);
+});
+
+test('backend off, insights off removes firebase blocks, the package, its pins and the Copy phase', async (t) => {
+    const dir = await seedFirebaseProject();
+    t.after(() => fs.remove(dir));
+    await applyBackendOption(dir, { enabled: false, firebase: false });
+
+    assert.equal(text(dir, 'iosApp/iosApp/iOSApp.swift'), 'import SwiftUI\n\ninit() {\n}\n');
+    assert.equal(text(dir, '.gitignore'), 'local.properties\n');
+    assert.equal(text(dir, 'gradle/libs.versions.toml'), '[plugins]\nkotlin = { id = "kotlin" }\n');
+    assert.equal(text(dir, 'iosApp/iosApp.xcodeproj/project.pbxproj'), PBXPROJ_WITHOUT_BACKEND);
+    assert.deepEqual(JSON.parse(text(dir, RESOLVED)).pins.map((pin) => pin.identity),
+        ['swift-package-manager-google-mobile-ads', 'swift-package-manager-google-user-messaging-platform']);
+});
+
+test('backend on, insights off keeps firebase blocks', async (t) => {
+    const dir = await seedFirebaseProject();
+    t.after(() => fs.remove(dir));
+    await applyBackendOption(dir, { enabled: true, firebase: false });
+
+    const swift = text(dir, 'iosApp/iosApp/iOSApp.swift');
+    assert.ok(!swift.includes('cmpose:'), swift);
+    assert.ok(swift.includes('import FirebaseCore\n') && swift.includes('FirebaseApp.configure()') && swift.includes('registerSignInBridge()'));
+    assert.equal(text(dir, '.gitignore'), 'local.properties\n\nandroidApp/google-services.json\niosApp/iosApp/GoogleService-Info.plist\n');
+    assert.equal(text(dir, 'iosApp/iosApp.xcodeproj/project.pbxproj'), read('project.pbxproj'));
+    assert.equal(text(dir, RESOLVED), read('Package.resolved'));
+});
+
+test('a boolean option keeps firebase blocks exactly when backend is on', async (t) => {
+    for (const enabled of [false, true]) {
+        const dir = await seedFirebaseProject();
+        t.after(() => fs.remove(dir));
+        await applyBackendOption(dir, enabled);
+        assert.equal(text(dir, '.gitignore').includes('google-services.json'), enabled);
+    }
+});
+
+test('stripBackendPbxproj with firebase: only GoogleSignIn and FirebaseAuth go from the packages; stripping the rest gives the project before the backend', () => {
+    const kept = stripBackendPbxproj(read('project.pbxproj'), { firebase: true });
+    assert.ok(kept.includes('repositoryURL = "https://github.com/firebase/firebase-ios-sdk";'));
+    assert.ok(!kept.includes('GoogleSignIn-iOS') && !kept.includes('FirebaseAuth'));
+    assert.equal(stripBackendPbxproj(kept), PBXPROJ_WITHOUT_BACKEND);
+    // CRLF survives
+    const crlf = stripBackendPbxproj(read('project.pbxproj').replace(/\n/g, '\r\n'), { firebase: true });
+    assert.equal(crlf, kept.replace(/\n/g, '\r\n'));
+});
+
+test('stripBackendPins with firebase keeps the Firebase pins and drops GoogleSignIn\'s', () => {
+    const pins = JSON.parse(stripBackendPins(read('Package.resolved'), { firebase: true })).pins.map((pin) => pin.identity);
+    assert.deepEqual(pins, ['firebase-ios-sdk', 'gtm-session-fetcher',
+        'swift-package-manager-google-mobile-ads', 'swift-package-manager-google-user-messaging-platform']);
+});
+
+test('a malformed firebase marker names its file', async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-backend-'));
+    t.after(() => fs.remove(dir));
+    await fs.outputFile(path.join(dir, 'shared/Broken.kt'), 'a\n// cmpose:firebase\nb\n');
+    await assert.rejects(applyBackendOption(dir, { enabled: false, firebase: true }), /shared[\\/]Broken\.kt: unclosed cmpose:firebase block/);
+});
+
+test('assertNoBackendResidue looks for the Firebase setup only when insights is off too', async (t) => {
+    const { assertNoBackendResidue } = require('../src/fileService');
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-backend-'));
+    t.after(() => fs.remove(dir));
+    await fs.outputFile(path.join(dir, 'androidApp/build.gradle.kts'), 'plugins { alias(libs.plugins.googleServices) }\n');
+    await assertNoBackendResidue(dir, 'com.example.app', { backend: false, insights: true });
+    await assert.rejects(assertNoBackendResidue(dir, 'com.example.app', { backend: false, insights: false }), /googleServices/);
+    await fs.outputFile(path.join(dir, 'iosApp/iosApp/iOSApp.swift'), 'import FirebaseAuth\n');
+    await assert.rejects(assertNoBackendResidue(dir, 'com.example.app', { backend: false, insights: true }), /FirebaseAuth/);
+});

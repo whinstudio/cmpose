@@ -12,7 +12,8 @@ const DEFAULTS = {
     purchases: false,
     ads: false,
     room: false,
-    backend: false
+    backend: false,
+    insights: false
 };
 
 test('undefined featuresConfig normalizes to all-false defaults', () => {
@@ -68,7 +69,7 @@ test('{network:"yes"} is rejected: booleans must be actual booleans', () => {
     assert.ok(result.error.length > 0);
 });
 
-for (const key of ['network', 'networkInspector', 'theming', 'multiLang', 'dataStore', 'detekt', 'purchases', 'ads', 'room', 'backend']) {
+for (const key of ['network', 'networkInspector', 'theming', 'multiLang', 'dataStore', 'detekt', 'purchases', 'ads', 'room', 'backend', 'insights']) {
     test(`non-boolean ${key} is rejected`, () => {
         for (const bad of ['true', 1, 0, null, [], {}]) {
             const result = normalizeFeaturesConfig({ [key]: bad });
@@ -189,7 +190,8 @@ test('a fully-populated, rule-consistent payload normalizes to itself (no-op)', 
         purchases: true,
         ads: true,
         room: true,
-        backend: false
+        backend: false,
+        insights: false
     });
 });
 
@@ -219,4 +221,13 @@ test('does not mutate the input object', () => {
     normalizeFeaturesConfig(input);
 
     assert.deepEqual(input, snapshot);
+});
+
+test('insights defaults to false and is a boolean key', () => {
+    const { DEFAULTS, BOOLEAN_KEYS } = require('../src/featuresConfig');
+    assert.equal(DEFAULTS.insights, false);
+    assert.ok(BOOLEAN_KEYS.includes('insights'));
+    assert.equal(normalizeFeaturesConfig({}).value.insights, false);
+    assert.deepEqual(normalizeFeaturesConfig({ insights: true }).value, { ...DEFAULTS, insights: true });
+    assert.match(normalizeFeaturesConfig({ insights: 'yes' }).error, /featuresConfig\.insights must be a boolean/);
 });

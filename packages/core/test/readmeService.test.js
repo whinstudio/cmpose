@@ -296,3 +296,9 @@ test('removeMarkedBlock cmpose:room does not take a room-favorites/room-notes op
 
     assert.equal(removeMarkedBlock(content, 'cmpose:room'), 'Intro\n\nEnd\n');
 });
+
+test('renderModules describes core/insights', () => {
+    const out = renderModules(['include(":shared")', 'include(":core:insights")'].join('\n'));
+
+    assert.ok(out.includes('- `:core:insights`: Firebase Crashlytics + Analytics (off until the Firebase config files are added)'), out);
+});

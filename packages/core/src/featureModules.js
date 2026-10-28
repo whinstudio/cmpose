@@ -166,6 +166,8 @@ const MONETIZATION_CAPABILITIES = [
 // before the backend release still serves every other option (server/ comes from the backend template)
 const BACKEND_CAPABILITIES = ['core/api', 'core/auth', 'feature/account', 'feature/sharing']
     .map((dir) => ({ dir, needed: (cfg) => cfg.backend === true }));
+// Likewise per request: a template pinned before the insights release still serves insights off
+const INSIGHTS_CAPABILITIES = [{ dir: 'core/insights', needed: (cfg) => cfg.insights === true }];
 
 class TemplateCapabilityError extends Error {
     constructor(missing) {
@@ -183,7 +185,7 @@ function templateLacksMessage(missing) {
 // Every directory the template at `templatePath` lacks for `cfg`'s on flags; without a config (a readiness
 // check: any of them means the cache is stale), every monetization directory
 async function missingTemplateCapabilities(templatePath, cfg = null) {
-    const capabilities = cfg ? [...MONETIZATION_CAPABILITIES, ...BACKEND_CAPABILITIES].filter((c) => c.needed(cfg)) : MONETIZATION_CAPABILITIES;
+    const capabilities = cfg ? [...MONETIZATION_CAPABILITIES, ...BACKEND_CAPABILITIES, ...INSIGHTS_CAPABILITIES].filter((c) => c.needed(cfg)) : MONETIZATION_CAPABILITIES;
     const missing = [];
     for (const capability of capabilities) {
         if (!(await fs.pathExists(path.join(templatePath, capability.dir)))) missing.push(capability.dir);

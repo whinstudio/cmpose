@@ -21,7 +21,8 @@ const DEFAULTS = Object.freeze({
     purchases: false,
     ads: false,
     room: false,
-    backend: false
+    backend: false,
+    insights: false
 });
 
 // Boolean flags = the contract's featuresConfig keys that have a default (networkBaseUrl and

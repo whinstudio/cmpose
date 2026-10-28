@@ -1,0 +1,22 @@
+[versions]
+kotlin = "2.3.21"
+firebaseBom = "34.4.0"
+firebaseCrashlyticsPlugin = "3.0.6"
+crashkios = "0.10.1"
+# cmpose:firebase
+googleServices = "4.4.4"
+# /cmpose:firebase
+
+[libraries]
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+crashkios-crashlytics = { module = "co.touchlab.crashkios:crashlytics", version.ref = "crashkios" }
+
+[plugins]
+kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+# cmpose:firebase
+googleServices = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+# /cmpose:firebase
+firebaseCrashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

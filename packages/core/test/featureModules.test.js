@@ -464,6 +464,21 @@ test('backend against a template without the backend directories fails with a 50
     });
 });
 
+test('insights against a template without core/insights fails with a 500 that names it', async () => {
+    await withTempDir(async (dir) => {
+        await seedMonetization(dir);
+        assert.deepEqual(await missingTemplateCapabilities(dir), []);
+        assert.deepEqual(await missingTemplateCapabilities(dir, { insights: false }), []);
+        await assert.rejects(assertTemplateCapabilities(dir, 'blank', { insights: true }), (err) => {
+            assert.ok(err instanceof TemplateCapabilityError, err.message);
+            assert.deepEqual(err.missing, ['core/insights']);
+            return true;
+        });
+        await fs.outputFile(path.join(dir, 'core', 'insights', 'build.gradle.kts'), '');
+        await assertTemplateCapabilities(dir, 'blank', { insights: true });
+    });
+});
+
 // Room (the template's room release): core/room with favorites and notes, feature/notes, its includes
 // and README blocks, in the template's real formats
 const ROOM = (set, part) => `core/room/src/${set}/kotlin/${PKG}/core/room/${part}`;

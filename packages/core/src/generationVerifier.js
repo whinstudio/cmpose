@@ -3,7 +3,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 const { log } = require('./log');
 const { listTextFiles } = require('./projectFiles');
-const { escapeRegExp, findResidue, BACKEND_RESIDUE_TOKENS } = require('./fileService');
+const { escapeRegExp, findResidue, backendResidueTokens, INSIGHTS_DIR, INSIGHTS_FIREBASE_PRODUCTS } = require('./fileService');
 const { TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('./featureModules');
 const { OLD_PACKAGE_NAME } = require('./templateIdentity');
 const { SERVER_DIR, INCLUDE_SERVER_BUILD, serverPackageOf } = require('./serverFromBackend');
@@ -303,8 +303,9 @@ async function verifyReview(projectPath, packagePath, problems) {
 }
 
 // Store-ready: a project with core/about keeps it wired and ships a Privacy Manifest whose data
-// declarations follow the ads and purchases flags (showcase: both on). Keyed on core/about, which no
-// removal path deletes, so a pre-store-ready template (staging, an older tag) is not checked.
+// declarations follow the ads, purchases, backend and insights flags (showcase: ads and purchases on,
+// insights when its template has core/insights). Keyed on core/about, which no removal path deletes,
+// so a pre-store-ready template (staging, an older tag) is not checked.
 async function verifyStoreReady(projectPath, input, packagePath, problems) {
     if (!(await fs.pathExists(path.join(projectPath, 'core/about/build.gradle.kts')))) return;
 
@@ -326,11 +327,16 @@ async function verifyStoreReady(projectPath, input, packagePath, problems) {
     if (!manifest.includes('NSPrivacyAccessedAPICategoryUserDefaults')) problems.add(`${manifestRel}: required reason APIs missing`);
 
     const flags = input.featuresConfig ? input.featuresConfig : { ads: true, purchases: true, backend: false };
+    const insights = await insightsOn(projectPath, input);
     if (flags.ads === true) {
         if (!manifest.includes('NSPrivacyCollectedDataTypeAdvertisingData')) {
             problems.add(`${manifestRel}: ad data not declared although ads is on`);
         }
-    } else if (manifest.includes('NSPrivacyCollectedDataTypeDeviceID') || /<key>NSPrivacyTracking<\/key>\s*<true\/>/.test(manifest)) {
+    } else if (manifest.includes('NSPrivacyCollectedDataTypeAdvertisingData')
+        || manifest.includes('NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising')
+        // Insights declares a device ID too (for analytics, not advertising)
+        || (!insights && manifest.includes('NSPrivacyCollectedDataTypeDeviceID'))
+        || /<key>NSPrivacyTracking<\/key>\s*<true\/>/.test(manifest)) {
         problems.add(`${manifestRel}: ad data declared although ads is off`);
     }
     const purchaseHistory = manifest.includes('NSPrivacyCollectedDataTypePurchaseHistory');
@@ -344,6 +350,46 @@ async function verifyStoreReady(projectPath, input, packagePath, problems) {
         problems.add(`${manifestRel}: account data not declared although backend is on`);
     } else if (flags.backend !== true && accountData) {
         problems.add(`${manifestRel}: account data declared although backend is off`);
+    }
+    const crashData = manifest.includes('NSPrivacyCollectedDataTypeCrashData');
+    const analyticsData = manifest.includes('NSPrivacyCollectedDataTypePurposeAnalytics');
+    if (insights) {
+        if (!crashData) problems.add(`${manifestRel}: crash data not declared although insights is on`);
+        if (!analyticsData) problems.add(`${manifestRel}: analytics data not declared although insights is on`);
+    } else {
+        if (crashData) problems.add(`${manifestRel}: crash data declared although insights is off`);
+        if (analyticsData) problems.add(`${manifestRel}: analytics data declared although insights is off`);
+    }
+}
+
+// Whether the project keeps core/insights: blank's flag; showcase when its template has it (an older one never had it)
+async function insightsOn(projectPath, input) {
+    if (input.templateType === 'blank') return (input.featuresConfig || {}).insights === true;
+    return fs.pathExists(path.join(projectPath, INSIGHTS_DIR));
+}
+
+// Insights: core/insights, included, its iOS bridge and the firebase-ios-sdk Crashlytics and Analytics products
+// exactly when it is on (insightsOn); none of them otherwise. Its privacy declarations are verifyStoreReady's.
+async function verifyInsights(projectPath, input, packagePath, problems) {
+    const on = await insightsOn(projectPath, input);
+    const state = on ? 'missing although insights is on' : 'present although insights is off';
+    const files = [
+        { rel: 'core/insights', check: 'core/insights/build.gradle.kts' },
+        { rel: `shared/src/iosMain/kotlin/${packagePath}/InsightsBridgeRegistration.kt` },
+        { rel: 'iosApp/iosApp/InsightsBridge.swift' }
+    ];
+    for (const { rel, check = rel } of files) {
+        if ((await fs.pathExists(path.join(projectPath, on ? check : rel))) !== on) problems.add(`${rel}: ${state}`);
+    }
+    if (on && !(await readIfExists(path.join(projectPath, 'settings.gradle.kts'))).includes('":core:insights"')) {
+        problems.add('settings.gradle.kts: :core:insights not included');
+    }
+    const pbxprojRel = 'iosApp/iosApp.xcodeproj/project.pbxproj';
+    const pbxproj = await readIfExists(path.join(projectPath, pbxprojRel));
+    for (const product of INSIGHTS_FIREBASE_PRODUCTS) {
+        const linked = new RegExp(`\\b${product}\\b`).test(pbxproj);
+        if (on && !linked) problems.add(`${pbxprojRel}: ${product} not linked although insights is on`);
+        if (!on && linked) problems.add(`${pbxprojRel}: ${product} linked although insights is off`);
     }
 }
 
@@ -562,7 +608,8 @@ async function verifyBackend(projectPath, input, cfg, problems) {
         for (const dir of [SERVER_DIR, ...BACKEND_MODULES.map((m) => m.dir)]) {
             if (await exists(dir)) problems.add(`${dir}: present ${where}`);
         }
-        const tokens = BACKEND_RESIDUE_TOKENS.filter((token) => token.label !== BACKEND_MARKER);
+        // Showcase keeps core/insights (and the Firebase setup with it) when its template has it
+        const tokens = backendResidueTokens({ insights: await insightsOn(projectPath, input) }).filter((token) => token.label !== BACKEND_MARKER);
         for (const problem of await findResidue(projectPath, input.packageName, { tokens, files: [] })) {
             problems.add(problem.split(path.sep).join('/'));
         }
@@ -755,6 +802,9 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
 
     // 9. Store-ready: core/about wiring and the Privacy Manifest declarations, for every template
     await verifyStoreReady(projectPath, input, packagePath, problems);
+
+    // 9b. Insights: core/insights, its iOS bridge and the Crashlytics and Analytics products exactly when it is on
+    await verifyInsights(projectPath, input, packagePath, problems);
 
     // 10. Network UX: core/update, the offline banner and the network state permission, for every template
     await verifyNetworkUx(projectPath, input, packagePath, problems);

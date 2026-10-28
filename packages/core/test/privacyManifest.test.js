@@ -85,3 +85,20 @@ test('a cmpose:backend block stays (without markers) for backend on and goes for
 test('the template fixture renders the same with backend off (no backend block)', () => {
     assert.equal(renderPrivacyManifest(TEMPLATE, { ads: false, purchases: false, backend: false }), read('expected-none.xcprivacy'));
 });
+
+test('privacy keeps the insights block only when on', () => {
+    const fixture = read('PrivacyInfo.insights.xcprivacy');
+    const on = renderPrivacyManifest(fixture, { insights: true });
+    for (const type of ['CrashData', 'ProductInteraction', 'DeviceID']) {
+        assert.ok(on.includes(`NSPrivacyCollectedDataType${type}`), on);
+    }
+    assert.ok(on.includes('NSPrivacyCollectedDataTypePurposeAnalytics'), on);
+    assert.ok(!on.includes('cmpose:'), on);
+    // Insights never turns tracking on
+    assert.match(on, /<key>NSPrivacyTracking<\/key>\n    <false\/>/);
+    const off = renderPrivacyManifest(fixture, { insights: false });
+    assert.ok(!off.includes('NSPrivacyCollectedDataTypeCrashData'), off);
+    assert.ok(!off.includes('NSPrivacyCollectedDataTypePurposeAnalytics'), off);
+    assert.ok(!off.includes('cmpose:'), off);
+    assert.match(off, /<key>NSPrivacyCollectedDataTypes<\/key>\n    <array\/>/);
+});

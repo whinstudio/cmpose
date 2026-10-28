@@ -1,12 +1,14 @@
 'use strict';
 const fs = require('fs-extra');
 const path = require('path');
-const { removeSwiftPackage, parseObjects, isa } = require('./xcodePackages');
+const { removeSwiftPackage, removeSwiftPackageProduct, removeRunScriptPhase } = require('./xcodePackages');
 const { PRIVACY_MANIFEST } = require('./privacyManifest');
 const { removeMarkedBlocks, applySwapMarkers } = require('./markerBlocks');
 
 // featuresConfig.backend: the template marks everything the backend adds (MAINTAINING.md → Backend markers).
 // Off strips it, on keeps it and drops only the markers. Runs on the template package, before the rename.
+// The Firebase setup the backend shares with insights (cmpose:firebase blocks, the firebase-ios-sdk package,
+// its pins and the GoogleService-Info copy phase) stays while either is on.
 
 const KIND_BY_EXTENSION = {
     '.kt': 'slash', '.kts': 'slash', '.swift': 'slash', '.xcconfig': 'slash',
@@ -58,9 +60,13 @@ const IMPORT_FILE_KINDS = new Set(['.kt', '.kts', '.swift']);
 
 const PBXPROJ = ['iosApp', 'iosApp.xcodeproj', 'project.pbxproj'];
 const PACKAGE_RESOLVED = ['iosApp', 'iosApp.xcodeproj', 'project.xcworkspace', 'xcshareddata', 'swiftpm', 'Package.resolved'];
-const BACKEND_PACKAGE_URLS = ['https://github.com/firebase/firebase-ios-sdk', 'https://github.com/google/GoogleSignIn-iOS'];
+const FIREBASE_PACKAGE_URL = 'https://github.com/firebase/firebase-ios-sdk';
+const GOOGLE_SIGN_IN_PACKAGE_URL = 'https://github.com/google/GoogleSignIn-iOS';
+// The backend's product of the shared Firebase package
+const BACKEND_FIREBASE_PRODUCT = 'FirebaseAuth';
 const COPY_GOOGLE_SERVICE_PHASE = 'Copy GoogleService-Info if present';
-const BACKEND_MEMBERSHIP_EXCEPTION = /^\t+(?:iosApp\.entitlements|"GoogleService-Info\.plist"),$/;
+const BACKEND_MEMBERSHIP_EXCEPTION = /^\t+iosApp\.entitlements,$/;
+const FIREBASE_MEMBERSHIP_EXCEPTION = /^\t+"GoogleService-Info\.plist",$/;
 const BACKEND_BUILD_SETTING = /^\t+(?:CODE_SIGN_ENTITLEMENTS|INFOPLIST_PREPROCESS|INFOPLIST_PREPROCESSOR_DEFINITIONS) = [^\n]*;$/;
 
 // Firebase, GoogleSignIn and what they pull in; the template's other pins (GMA, UMP) stay
@@ -69,45 +75,35 @@ const BACKEND_PIN_IDENTITIES = new Set([
     'googleappmeasurement', 'googledatatransport', 'googlesignin-ios', 'googleutilities', 'grpc-binary',
     'gtm-session-fetcher', 'gtmappauth', 'interop-ios-for-google-sdks', 'leveldb', 'nanopb', 'promises', 'swift-protobuf'
 ]);
+// What only GoogleSignIn pulls in: with the Firebase setup kept, only these go
+const GOOGLE_SIGN_IN_PIN_IDENTITIES = new Set(['appauth-ios', 'googlesignin-ios', 'gtmappauth']);
 
-// Off: the Firebase and GoogleSignIn packages, the build phase copying GoogleService-Info.plist, the
-// membership exceptions of the entitlements and GoogleService-Info.plist, and the entitlements and
-// Info.plist preprocessing (LOCAL_SERVER) build settings. Text edits only.
-function stripBackendPbxproj(content) {
+// Off: the GoogleSignIn package, the membership exception of the entitlements, and the entitlements and
+// Info.plist preprocessing (LOCAL_SERVER) build settings. Without `firebase` also the Firebase package, the
+// build phase copying GoogleService-Info.plist and its membership exception; with it only FirebaseAuth of the
+// Firebase package. Text edits only.
+function stripBackendPbxproj(content, { firebase = false } = {}) {
     const crlf = content.includes('\r\n');
     let result = crlf ? content.replace(/\r\n/g, '\n') : content;
-    for (const url of BACKEND_PACKAGE_URLS) result = removeSwiftPackage(result, url);
-    result = removeCopyGoogleServicePhase(result);
+    result = removeSwiftPackage(result, GOOGLE_SIGN_IN_PACKAGE_URL);
+    if (firebase) {
+        result = removeSwiftPackageProduct(result, FIREBASE_PACKAGE_URL, BACKEND_FIREBASE_PRODUCT);
+    } else {
+        result = removeSwiftPackage(result, FIREBASE_PACKAGE_URL);
+        result = removeCopyGoogleServicePhase(result);
+    }
     result = result.split('\n')
-        .filter((line) => !BACKEND_MEMBERSHIP_EXCEPTION.test(line) && !BACKEND_BUILD_SETTING.test(line))
+        .filter((line) => !BACKEND_MEMBERSHIP_EXCEPTION.test(line) && !BACKEND_BUILD_SETTING.test(line)
+            && (firebase || !FIREBASE_MEMBERSHIP_EXCEPTION.test(line)))
         .join('\n');
-    if (result.includes(COPY_GOOGLE_SERVICE_PHASE)) {
+    if (!firebase && result.includes(COPY_GOOGLE_SERVICE_PHASE)) {
         throw new Error(`stripBackendPbxproj: "${COPY_GOOGLE_SERVICE_PHASE}" is in project.pbxproj but could not be removed (unexpected formatting)`);
     }
     return crlf ? result.replace(/\n/g, '\r\n') : result;
 }
 
 function removeCopyGoogleServicePhase(content) {
-    const lines = content.split('\n');
-    const phases = parseObjects(lines).filter((object) => isa(object) === 'PBXShellScriptBuildPhase'
-        && object.text.includes(`name = "${COPY_GOOGLE_SERVICE_PHASE}";`));
-    if (phases.length === 0) return content;
-    // One object per isa: a phase whose closing line is missing would swallow the next object
-    if (phases.some((object) => (object.text.match(/\bisa = /g) || []).length !== 1)) {
-        throw new Error(`stripBackendPbxproj: "${COPY_GOOGLE_SERVICE_PHASE}" could not be parsed (unexpected formatting)`);
-    }
-    const ids = new Set(phases.map((object) => object.id));
-    const drop = new Set();
-    for (const object of phases) {
-        for (let i = object.start; i <= object.end; i++) drop.add(i);
-    }
-    const listEntry = /^\t+([0-9A-F]{24})(?: \/\*.*?\*\/)?,$/;
-    lines.forEach((line, i) => {
-        const match = line.match(listEntry);
-        if (match && ids.has(match[1])) drop.add(i);
-    });
-    return lines.filter((_, i) => !drop.has(i)).join('\n')
-        .replace(/\n\n\/\* Begin (\w+) section \*\/\n\/\* End \1 section \*\/(?=\n)/g, '');
+    return removeRunScriptPhase(content, COPY_GOOGLE_SERVICE_PHASE);
 }
 
 // Package.resolved without the pins whose identity is in `identities`, in Xcode's layout ("key" : value).
@@ -123,9 +119,9 @@ function stripPins(json, identities) {
     return `${text}\n`;
 }
 
-// Off: Package.resolved without the backend's pins
-function stripBackendPins(json) {
-    return stripPins(json, BACKEND_PIN_IDENTITIES);
+// Off: Package.resolved without the backend's pins (GoogleSignIn's only, with `firebase`)
+function stripBackendPins(json, { firebase = false } = {}) {
+    return stripPins(json, firebase ? GOOGLE_SIGN_IN_PIN_IDENTITIES : BACKEND_PIN_IDENTITIES);
 }
 
 function kindOf(file) {
@@ -156,19 +152,23 @@ async function removeAndPrune(projectDir, target) {
     }
 }
 
-function renderFile(content, file, enabled) {
+function renderFile(content, file, enabled, firebase) {
     const kind = kindOf(file);
     let out = content;
     if (kind === 'slash') out = applySwapMarkers(out, enabled);
     out = removeMarkedBlocks(out, kind, enabled);
+    out = removeMarkedBlocks(out, kind, firebase, 'firebase');
     if (!enabled && IMPORT_FILE_KINDS.has(path.extname(file))) {
         out = out.split('\n').filter((line) => !BACKEND_ONLY_IMPORTS.some((re) => re.test(line))).join('\n');
     }
     return out;
 }
 
-// The privacy manifest's cmpose:backend block belongs to writePrivacyManifest, so it is left alone here
-async function applyBackendOption(projectDir, enabled) {
+// `option`: { enabled, firebase } (firebase = backend || insights; backend on implies it), or a boolean for
+// both. The privacy manifest's cmpose:backend block belongs to writePrivacyManifest, so it is left alone here.
+async function applyBackendOption(projectDir, option) {
+    const enabled = typeof option === 'boolean' ? option : option.enabled === true;
+    const firebase = enabled || (typeof option === 'object' && option.firebase === true);
     const root = path.resolve(projectDir);
     if (!enabled) {
         for (const relative of BACKEND_PATHS) {
@@ -181,10 +181,11 @@ async function applyBackendOption(projectDir, enabled) {
     for (const file of await listMarkableFiles(root)) {
         if (file === privacyManifest) continue;
         const content = await fs.readFile(file, 'utf8');
-        if (!content.includes('cmpose:backend') && (enabled || !IMPORT_FILE_KINDS.has(path.extname(file)))) continue;
+        const marked = content.includes('cmpose:backend') || content.includes('cmpose:firebase');
+        if (!marked && (enabled || !IMPORT_FILE_KINDS.has(path.extname(file)))) continue;
         let updated;
         try {
-            updated = renderFile(content, file, enabled);
+            updated = renderFile(content, file, enabled, firebase);
         } catch (error) {
             throw new Error(`${path.relative(root, file)}: ${error.message}`);
         }
@@ -196,14 +197,14 @@ async function applyBackendOption(projectDir, enabled) {
     const pbxproj = path.join(root, ...PBXPROJ);
     if (await fs.pathExists(pbxproj)) {
         const content = await fs.readFile(pbxproj, 'utf8');
-        const updated = stripBackendPbxproj(content);
+        const updated = stripBackendPbxproj(content, { firebase });
         if (updated !== content) await fs.writeFile(pbxproj, updated);
     }
 
     const resolved = path.join(root, ...PACKAGE_RESOLVED);
     if (await fs.pathExists(resolved)) {
         const content = await fs.readFile(resolved, 'utf8');
-        const updated = stripBackendPins(content);
+        const updated = stripBackendPins(content, { firebase });
         if (updated === null) await removeAndPrune(root, resolved);
         else if (updated !== content) await fs.writeFile(resolved, updated);
     }

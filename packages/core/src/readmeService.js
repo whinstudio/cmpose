@@ -26,7 +26,8 @@ const CORE_DESCRIPTIONS = {
     ads: 'AdMob ads and consent (test IDs)',
     room: 'Room database (bundled SQLite): AppDatabase, DAOs and schemas',
     api: "the app's client models and routes for the backend API, checked by ApiContractTest",
-    auth: "Firebase sign-in: email, Google, Apple; the server client's token"
+    auth: "Firebase sign-in: email, Google, Apple; the server client's token",
+    insights: 'Firebase Crashlytics + Analytics (off until the Firebase config files are added)'
 };
 
 function renderRequirements(versions, { minSdk, iosVersion }) {

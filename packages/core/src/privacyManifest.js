@@ -4,7 +4,7 @@ const path = require('path');
 // Store-ready: iosApp/iosApp/PrivacyInfo.xcprivacy marks what a flag adds. A block (each marker on its own
 // line) goes when its flag is off and loses only its markers when on; the tracking value line flips.
 const PRIVACY_MANIFEST = ['iosApp', 'iosApp', 'PrivacyInfo.xcprivacy'];
-const BLOCKS = ['ads', 'purchases', 'backend'];
+const BLOCKS = ['ads', 'purchases', 'backend', 'insights'];
 const TRACKING_LINE = /<true\/><!-- cmpose:ads-tracking -->/;
 
 function renderPrivacyManifest(content, flags) {
