@@ -8,7 +8,7 @@ test('core exposes its version, template identity, limits and pins', () => {
     assert.strictEqual(core.templateIdentity.OLD_PACKAGE_NAME, 'com.kturker.multiplatform');
     assert.strictEqual(core.templateIdentity.OLD_PROJECT_NAME, 'Multiplatform');
     assert.deepStrictEqual(core.limits, { minSdkMin: 24, minSdkMax: 36, iosVersionMin: '15.0', iosVersionMax: '26.2', maxModules: 3 });
-    assert.deepStrictEqual(core.pins.cmp, { repo: 'whinstudio/cmpose-template', ref: 'template-2026.10.22' });
+    assert.deepStrictEqual(core.pins.cmp, { repo: 'whinstudio/cmpose-template', ref: 'template-2026.10.28' });
     assert.deepStrictEqual(core.pins.backend, { repo: 'whinstudio/cmpose-backend-template', ref: 'backend-template-2026.10.26' });
 });
 
