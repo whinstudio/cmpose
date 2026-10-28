@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const fs = require('fs');
 
-const { removeSwiftPackage } = require('../src/xcodePackages');
+const { removeSwiftPackage, removeSwiftPackageProduct, removeRunScriptPhase } = require('../src/xcodePackages');
 
 const FIXTURES = path.join(__dirname, 'fixtures', 'monetization');
 const read = (name) => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
@@ -111,4 +111,54 @@ test('removeSwiftPackage throws when the package is there but its objects cannot
     // Without the package, an unusual layout is left as it is
     const spacesWithout = WITHOUT_ADS.replace(/^\t+/gm, (tabs) => '    '.repeat(tabs.length));
     assert.equal(removeSwiftPackage(spacesWithout, GMA_URL), spacesWithout);
+});
+
+// The insights fixture is the backend's project with firebase-ios-sdk's FirebaseCrashlytics and FirebaseAnalytics
+// products and the "Upload Crashlytics symbols if configured" phase added
+const FIREBASE_URL = 'https://github.com/firebase/firebase-ios-sdk';
+const UPLOAD_PHASE = 'Upload Crashlytics symbols if configured';
+const WITH_INSIGHTS = fs.readFileSync(path.join(__dirname, 'fixtures', 'insights', 'project.pbxproj'), 'utf8');
+const WITHOUT_INSIGHTS = fs.readFileSync(path.join(__dirname, 'fixtures', 'backend', 'project.pbxproj'), 'utf8');
+const stripInsights = (content) => removeRunScriptPhase(
+    removeSwiftPackageProduct(removeSwiftPackageProduct(content, FIREBASE_URL, 'FirebaseCrashlytics'), FIREBASE_URL, 'FirebaseAnalytics'),
+    UPLOAD_PHASE
+);
+
+test('removing the insights products and phase gives the project before insights byte for byte', () => {
+    assert.equal(stripInsights(WITH_INSIGHTS), WITHOUT_INSIGHTS);
+    // CRLF survives, and a second pass changes nothing
+    const crlf = (text) => text.replace(/\n/g, '\r\n');
+    assert.equal(stripInsights(crlf(WITH_INSIGHTS)), crlf(WITHOUT_INSIGHTS));
+    assert.equal(stripInsights(WITHOUT_INSIGHTS), WITHOUT_INSIGHTS);
+});
+
+test('removeSwiftPackageProduct keeps the package and its other products', () => {
+    const result = removeSwiftPackageProduct(WITH_INSIGHTS, FIREBASE_URL, 'FirebaseCrashlytics');
+    assert.ok(!result.includes('FirebaseCrashlytics'), result);
+    for (const kept of ['productName = FirebaseAnalytics;', 'productName = FirebaseAuth;', 'repositoryURL = "https://github.com/firebase/firebase-ios-sdk";']) {
+        assert.ok(result.includes(kept), kept);
+    }
+    // Asked of another package, the product it still links is an error, never a silently unchanged project
+    assert.throws(() => removeSwiftPackageProduct(WITH_INSIGHTS, GMA_URL, 'FirebaseCrashlytics'), /FirebaseCrashlytics/);
+});
+
+test('removeRunScriptPhase removes only the named phase', () => {
+    const result = removeRunScriptPhase(WITH_INSIGHTS, UPLOAD_PHASE);
+    assert.ok(!result.includes(UPLOAD_PHASE), result);
+    assert.ok(result.includes('name = "Copy GoogleService-Info if present";'));
+    assert.ok(result.includes('name = "Compile Kotlin Framework";'));
+    assert.ok(result.includes('productName = FirebaseCrashlytics;'));
+    // Not there: unchanged, whatever the layout
+    assert.equal(removeRunScriptPhase(WITHOUT_INSIGHTS, UPLOAD_PHASE), WITHOUT_INSIGHTS);
+    const spaces = WITHOUT_INSIGHTS.replace(/^\t+/gm, (tabs) => '    '.repeat(tabs.length));
+    assert.equal(removeRunScriptPhase(spaces, UPLOAD_PHASE), spaces);
+});
+
+test('removeRunScriptPhase throws when the phase is there but cannot be parsed', () => {
+    const spaces = WITH_INSIGHTS.replace(/^\t+/gm, (tabs) => '    '.repeat(tabs.length));
+    assert.throws(() => removeRunScriptPhase(spaces, UPLOAD_PHASE), /Upload Crashlytics symbols if configured/);
+    // A phase whose closing line is missing would swallow the next object
+    const unclosed = WITH_INSIGHTS.replace(/(name = "Upload Crashlytics symbols if configured";[\s\S]*?fi\\n";\n)\t\t\};\n/, '$1');
+    assert.notEqual(unclosed, WITH_INSIGHTS);
+    assert.throws(() => removeRunScriptPhase(unclosed, UPLOAD_PHASE), /Upload Crashlytics symbols if configured/);
 });

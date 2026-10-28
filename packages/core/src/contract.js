@@ -8,7 +8,7 @@ const { OLD_PACKAGE_NAME } = require('./templateIdentity');
 // sync-contract.sh; featuresConfig.js and the generator read the same objects.
 const SCHEMA = {
     templateTypes: ['blank', 'showcase'],
-    featuresConfigKeys: ['network', 'networkInspector', 'networkBaseUrl', 'theming', 'multiLang', 'dataStore', 'detekt', 'detektYamlContent', 'purchases', 'ads', 'room', 'backend'],
+    featuresConfigKeys: ['network', 'networkInspector', 'networkBaseUrl', 'theming', 'multiLang', 'dataStore', 'detekt', 'detektYamlContent', 'purchases', 'ads', 'room', 'backend', 'insights'],
     dependencyRules: {
         alwaysOn: ['koin', 'navigation'],
         implies: { networkInspector: ['network'], backend: ['multiLang', 'network'] },  // inspector => network; backend => multiLang + network
@@ -32,7 +32,8 @@ const SCHEMA = {
             'core/ads': { requires: ['ads'], note: 'AdMob banner/interstitial/rewarded + UMP/ATT consent (test IDs)' },
             'core/room': { requires: ['room'], note: 'Room KMP database (bundled SQLite): AppDatabase, DAOs, schemas/' },
             'core/api': { requires: ['backend'], note: "the app's client models and routes for the backend API, checked by ApiContractTest" },
-            'core/auth': { requires: ['backend'], note: 'Firebase sign-in (email, Google, Apple); the server client\'s token' }
+            'core/auth': { requires: ['backend'], note: 'Firebase sign-in (email, Google, Apple); the server client\'s token' },
+            'core/insights': { requires: ['insights'], note: 'Firebase Crashlytics + Analytics; a no-op until the Firebase config files are added' }
         },
         // featuresConfig flag -> feature modules kept in a blank project (same requires/requiresAny rules).
         featureModules: {

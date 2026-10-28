@@ -52,7 +52,8 @@ screen, a `build-logic` with convention plugins, and a README with a release che
   theming (light/dark/system), multi-language strings, DataStore, Room (KMP, bundled SQLite),
   RevenueCat purchases with a custom Compose paywall, AdMob ads with UMP/ATT consent, detekt,
   backend (Ktor server, Firebase sign-in, sharing; blank only; turns on multi-language and
-  networking).
+  networking), insights (Firebase Crashlytics + Analytics; off until you add the Firebase config
+  files).
 - **Your own feature modules:** up to 3, each with contract/data/domain/presentation layers.
 - **CI:** an optional GitHub Actions workflow.
 - **Your names everywhere:** package, bundle id, app name, min SDK and iOS deployment target.

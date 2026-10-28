@@ -26,6 +26,7 @@ test('core exposes the request parser, the template types and the validator file
 test('core exposes the featuresConfig defaults (frozen)', () => {
     const { DEFAULTS, BOOLEAN_KEYS } = core.featuresConfig;
     assert.deepStrictEqual(Object.keys(DEFAULTS).sort(), [...BOOLEAN_KEYS].sort());
+    assert.ok(BOOLEAN_KEYS.includes('insights'));
     assert.ok(Object.values(DEFAULTS).every((v) => v === false));
     assert.ok(Object.isFrozen(DEFAULTS));
 });

@@ -1,0 +1,270 @@
+{
+  "limits": {
+    "minSdkMin": 24,
+    "minSdkMax": 36,
+    "iosVersionMin": "15.0",
+    "iosVersionMax": "26.2",
+    "maxModules": 3
+  },
+  "maxLengths": {
+    "projectName": 30,
+    "appName": 30,
+    "packageName": 50,
+    "moduleName": 20,
+    "minSdk": 2,
+    "iosVersion": 8,
+    "networkBaseUrl": 100
+  },
+  "regex": {
+    "projectName": "^[a-zA-Z]+$",
+    "packageName": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*){2,}$",
+    "moduleName": "^[a-z][a-z0-9]*$",
+    "iosVersionFormat": "^\\d+(\\.\\d+){1,2}$"
+  },
+  "kotlinHardKeywords": [
+    "as",
+    "break",
+    "class",
+    "continue",
+    "do",
+    "else",
+    "false",
+    "for",
+    "fun",
+    "if",
+    "in",
+    "interface",
+    "is",
+    "null",
+    "object",
+    "package",
+    "return",
+    "super",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typealias",
+    "typeof",
+    "val",
+    "var",
+    "when",
+    "while"
+  ],
+  "reservedModuleNames": [
+    "build",
+    "monetization",
+    "notes",
+    "account",
+    "sharing"
+  ],
+  "reservedPackagePrefix": "com.kturker.multiplatform",
+  "messages": {
+    "projectNameSpaces": "Project Name cannot contain spaces",
+    "projectNameInvalid": "Project Name must contain only letters (a-z, A-Z)",
+    "projectNameTooLong": "Project Name must be at most 30 characters",
+    "packageNameSpaces": "Package Name cannot contain spaces",
+    "packageNameInvalid": "Invalid Package Name. Must start with a letter, contain at least two dots (3 segments), and use only lowercase letters and numbers (e.g., com.example.app). Segments cannot be Kotlin keywords (e.g., in, is, object), and the template's reserved package (or any package under it) cannot be used.",
+    "packageNameTooLong": "Package Name must be at most 50 characters",
+    "appNameInvalid": "App Name must be 1-30 characters using only letters, numbers, spaces and . _ ' - (no leading or trailing spaces)",
+    "urlInvalid": "Invalid Base URL. Please enter a valid http(s) URL of at most 100 characters without spaces, quotes, backslashes or $ (e.g., https://api.example.com)",
+    "maxModulesReached": "Maximum 3 feature modules allowed",
+    "moduleNameInvalid": "Module name must start with a letter, contain only lowercase letters and numbers (a-z, 0-9), and not be a Kotlin keyword (e.g., in, is, object) or one of the reserved names (build, monetization, notes, account, sharing)",
+    "moduleNameTooLong": "Module name must be at most 20 characters",
+    "moduleNameDuplicate": "Each module name can be used only once",
+    "minSdkInvalid": "Min SDK must be a number between 24 and 36",
+    "iosVersionInvalid": "iOS Version must be between 15.0 and 26.2"
+  },
+  "templateTypes": [
+    "blank",
+    "showcase"
+  ],
+  "featuresConfigKeys": [
+    "network",
+    "networkInspector",
+    "networkBaseUrl",
+    "theming",
+    "multiLang",
+    "dataStore",
+    "detekt",
+    "detektYamlContent",
+    "purchases",
+    "ads",
+    "room",
+    "backend"
+  ],
+  "dependencyRules": {
+    "alwaysOn": [
+      "koin",
+      "navigation"
+    ],
+    "implies": {
+      "networkInspector": [
+        "network"
+      ],
+      "backend": [
+        "multiLang",
+        "network"
+      ]
+    },
+    "auto": {
+      "dataStore": [
+        "theming",
+        "multiLang"
+      ]
+    }
+  },
+  "projectOptions": {
+    "ci": {
+      "default": false,
+      "templates": [
+        "blank",
+        "showcase"
+      ]
+    }
+  },
+  "anatomy": {
+    "always": [
+      "androidApp",
+      "iosApp",
+      "shared",
+      "core/about",
+      "core/domain",
+      "core/image",
+      "core/logging",
+      "core/presentation",
+      "core/navigation",
+      "core/review",
+      "core/update",
+      "build-logic"
+    ],
+    "alwaysNote": "shared wires Koin (DI) + Navigation, which are always included; core/logging sets up Kermit logging, core/review asks for in-app reviews and core/about shows the version, legal links and licences in every project, core/update checks for app updates, core/image loads images with Coil.",
+    "coreModules": {
+      "core/network": {
+        "requires": [
+          "network"
+        ],
+        "note": "Ktor HTTP client; Coil network images"
+      },
+      "core/designsystem": {
+        "requiresAny": [
+          "theming",
+          "multiLang"
+        ],
+        "note": "theme (palette + KtTheme) and/or LocalStringResources"
+      },
+      "core/multilang": {
+        "requires": [
+          "multiLang"
+        ],
+        "note": "i18n / localization"
+      },
+      "core/database": {
+        "requires": [
+          "dataStore"
+        ],
+        "note": "DataStore persistence; with theming also the saved Light/Dark/System choice (DarkModeManager)"
+      },
+      "core/purchases": {
+        "requires": [
+          "purchases"
+        ],
+        "note": "offer / purchase / restore API, RevenueCat KMP (Test Store key: replace before you ship)"
+      },
+      "core/ads": {
+        "requires": [
+          "ads"
+        ],
+        "note": "AdMob banner/interstitial/rewarded + UMP/ATT consent (test IDs)"
+      },
+      "core/room": {
+        "requires": [
+          "room"
+        ],
+        "note": "Room KMP database (bundled SQLite): AppDatabase, DAOs, schemas/"
+      },
+      "core/api": {
+        "requires": [
+          "backend"
+        ],
+        "note": "the app's client models and routes for the backend API, checked by ApiContractTest"
+      },
+      "core/auth": {
+        "requires": [
+          "backend"
+        ],
+        "note": "Firebase sign-in (email, Google, Apple); the server client's token"
+      }
+    },
+    "featureModules": {
+      "feature/monetization": {
+        "requiresAny": [
+          "purchases",
+          "ads"
+        ],
+        "note": "custom paywall (Compose) and/or ads demo"
+      },
+      "feature/notes": {
+        "requires": [
+          "room"
+        ],
+        "note": "Notes demo screen on Room (blank only; showcase uses Room for favorites)"
+      },
+      "feature/account": {
+        "requires": [
+          "backend"
+        ],
+        "note": "sign-in screens and the account (blank only)"
+      },
+      "feature/sharing": {
+        "requires": [
+          "backend"
+        ],
+        "note": "shared spaces and invites (blank only)"
+      }
+    },
+    "detektDir": {
+      "requires": [
+        "detekt"
+      ],
+      "path": "detekt/"
+    },
+    "serverDir": {
+      "path": "server/",
+      "requires": [
+        "backend"
+      ]
+    },
+    "showcaseFeatures": [
+      "feature/home",
+      "feature/monetization",
+      "feature/onboarding"
+    ],
+    "customFeaturePath": "feature/<name>",
+    "customFeatureLayers": [
+      "contract",
+      "data",
+      "domain",
+      "presentation"
+    ]
+  },
+  "deepLinks": {
+    "scheme": "projectName, lower case",
+    "showcase": [
+      "user/{username}",
+      "settings"
+    ],
+    "blank": [
+      "",
+      "<module>"
+    ],
+    "backend": {
+      "links": [
+        "invite/<token>"
+      ],
+      "requires": [
+        "backend"
+      ]
+    }
+  }
+}

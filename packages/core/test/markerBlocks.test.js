@@ -63,3 +63,10 @@ test('kindOf maps the backend template files to their marker form', () => {
     for (const [file, kind] of Object.entries(expected)) assert.strictEqual(kindOf(file), kind, file);
     for (const file of ['Dockerfile', 'tools/gate.sh', 'a.swift', 'a.json', 'x.example']) assert.strictEqual(kindOf(file), undefined, file);
 });
+
+test('firebase blocks are their own tag: backend markers leave them alone', () => {
+    const src = 'a\n// cmpose:firebase\nb\n// /cmpose:firebase\n// cmpose:backend\nc\n// /cmpose:backend\n';
+    assert.strictEqual(removeMarkedBlocks(src, 'slash', false), 'a\n// cmpose:firebase\nb\n// /cmpose:firebase\n');
+    assert.strictEqual(removeMarkedBlocks(src, 'slash', false, 'firebase'), 'a\n// cmpose:backend\nc\n// /cmpose:backend\n');
+    assert.strictEqual(removeMarkedBlocks(src, 'slash', true, 'firebase'), 'a\nb\n// cmpose:backend\nc\n// /cmpose:backend\n');
+});

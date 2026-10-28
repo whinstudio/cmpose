@@ -28,3 +28,14 @@ test('showcase never warns about the backend', () => {
         assert.ok(!w.some((m) => /Firebase|server/.test(m)), JSON.stringify(w));
     }
 });
+
+test('insights on warns about the config files', () => {
+    const message = 'Crashlytics and Analytics stay off until you add the Firebase config files (README, Insights).';
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { insights: true } }), [message]);
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { insights: false } }), []);
+    // Showcase: insights is on only when its template has core/insights (the caller says)
+    assert.ok(generationWarnings({ templateType: 'showcase', featuresConfig: null, insights: true }).includes(message));
+    assert.ok(!generationWarnings({ templateType: 'showcase', featuresConfig: null }).includes(message));
+    // Backend and insights both on: both warnings
+    assert.strictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { backend: true, insights: true } }).length, 2);
+});

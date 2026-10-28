@@ -45,3 +45,15 @@ test('the backend flag changes the contract hash', () => {
     assert.strictEqual(before.featuresConfigKeys.includes('backend'), false);
     assert.notStrictEqual(hashContract(contractFacts()), hashContract(before));
 });
+
+test('insights adds core/insights to the anatomy', () => {
+    const facts = contractFacts();
+    assert.ok(facts.featuresConfigKeys.includes('insights'));
+    assert.deepStrictEqual(facts.anatomy.coreModules['core/insights'].requires, ['insights']);
+});
+
+test('the insights flag changes the contract hash', () => {
+    const before = require('./fixtures/contract/facts-before-insights.json');
+    assert.strictEqual(before.featuresConfigKeys.includes('insights'), false);
+    assert.notStrictEqual(hashContract(contractFacts()), hashContract(before));
+});

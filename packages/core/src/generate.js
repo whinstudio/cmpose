@@ -6,7 +6,7 @@ const { OLD_PACKAGE_NAME, OLD_PROJECT_NAME } = require('./templateIdentity');
 const { readTemplateVersions, COMMIT_FILE_NAME, REF_FILE_NAME } = require('./templateVersions');
 const {
     processAllFiles, movePackageStructure, updateiOSProject, updateiOSConfigFiles,
-    cleanImlFiles, wireFeatureModules, processBlankApp, sortKotlinImports
+    cleanImlFiles, wireFeatureModules, processBlankApp, sortKotlinImports, INSIGHTS_DIR
 } = require('./fileService');
 const { applyBlankShell, cloneFeatureModules, assertTemplateCapabilities } = require('./featureModules');
 const { applyCiOption } = require('./ciOption');
@@ -27,6 +27,11 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
     const { projectName, appName, packageName, templateType, features, featuresConfig, ci, minSdk, iosVersion } = value;
     const blankConfig = templateType === 'blank' ? featuresConfig : null;
     const backendOn = templateType === 'blank' && featuresConfig.backend === true;
+    // Showcase keeps insights like every optional module, once the template has it (an older one never had the
+    // Firebase setup outside the backend)
+    const insightsOn = templateType === 'blank'
+        ? featuresConfig.insights === true
+        : await fs.pathExists(path.join(projectDir, INSIGHTS_DIR));
     // Before anything is touched: server/ comes from the backend template only
     if (backendOn && !(backendTemplate && backendTemplate.dir)) {
         throw new Error('backend: the backend template is required (backendTemplate)');
@@ -65,8 +70,9 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
     // blank's shell and every requested module come from the template, applied on the
     // template's own package before the rename below
     await applyBlankShell(projectDir, templateType, featuresConfig);
-    // The backend's parts stay (markers dropped) for blank with backend on; everywhere else they go
-    await applyBackendOption(projectDir, backendOn);
+    // The backend's parts stay (markers dropped) for blank with backend on; everywhere else they go. The
+    // Firebase setup it shares with insights stays while either is on.
+    await applyBackendOption(projectDir, { enabled: backendOn, firebase: backendOn || insightsOn });
     await cloneFeatureModules(projectDir, sanitizedFeatures);
     log.info(`✅ Template skeleton ready (${sanitizedFeatures.length} feature modules)`);
 
@@ -92,10 +98,10 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
     await updateiOSProject(projectDir, packageName, iosVersion);
     await updateiOSConfigFiles(projectDir, packageName, appName, iosVersion);
     // Store-ready: the privacy manifest declares the data the on flags collect (showcase: ads and
-    // purchases on, never backend)
+    // purchases on, never backend, insights when its template has core/insights)
     await writePrivacyManifest(projectDir, templateType === 'blank'
-        ? { ads: featuresConfig.ads === true, purchases: featuresConfig.purchases === true, backend: backendOn }
-        : { ads: true, purchases: true, backend: false });
+        ? { ads: featuresConfig.ads === true, purchases: featuresConfig.purchases === true, backend: backendOn, insights: insightsOn }
+        : { ads: true, purchases: true, backend: false, insights: insightsOn });
     log.info('✅ iOS configuration updated');
 
     // Package rename and module cloning moved imports out of ktlint order: re-sort them last
@@ -131,7 +137,7 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
         features: sanitizedFeatures,
         versions,
         serverTemplate,
-        warnings: generationWarnings({ templateType, featuresConfig })
+        warnings: generationWarnings({ templateType, featuresConfig, insights: insightsOn })
     };
 }
 

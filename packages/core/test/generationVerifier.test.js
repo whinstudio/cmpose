@@ -1442,6 +1442,34 @@ test('backend off: Firebase in the Xcode project, google-services or BACKEND_CLI
     }
 });
 
+test('backend off, insights on: the shared Firebase setup is not residue, the backend\'s FirebaseAuth still is (backend)', async () => {
+    await withProject(async (dir) => {
+        const input = { ...BACKEND_INPUT(false), featuresConfig: { ...BACKEND_INPUT(false).featuresConfig, insights: true } };
+        await seedValid(dir, input);
+        await fs.outputFile(path.join(dir, 'androidApp/build.gradle.kts'), 'plugins { alias(libs.plugins.googleServices) }\n');
+        await fs.outputFile(path.join(dir, 'iosApp/iosApp/iOSApp.swift'), 'import FirebaseCore\nimport FirebaseAuth\n');
+        const problems = await backendProblems(dir, input);
+        assert.ok(!problems.some((p) => /googleServices|FirebaseCore/.test(p)), problems.join('\n'));
+        assert.ok(problems.includes('iosApp/iosApp/iOSApp.swift: FirebaseAuth'), problems.join('\n'));
+        // Insights off too: the Firebase setup is residue again
+        const off = await backendProblems(dir, BACKEND_INPUT(false));
+        assert.ok(off.includes('androidApp/build.gradle.kts: googleServices'), off.join('\n'));
+        assert.ok(off.includes('iosApp/iosApp/iOSApp.swift: FirebaseCore'), off.join('\n'));
+    });
+});
+
+test('showcase keeps the shared Firebase setup only when its template has core/insights (backend)', async () => {
+    await withProject(async (dir) => {
+        await seedValid(dir, SHOWCASE_INPUT);
+        await fs.outputFile(path.join(dir, 'iosApp/iosApp/iOSApp.swift'), 'import FirebaseCore\n');
+        const without = await backendProblems(dir, SHOWCASE_INPUT);
+        assert.ok(without.includes('iosApp/iosApp/iOSApp.swift: FirebaseCore'), without.join('\n'));
+        await fs.outputFile(path.join(dir, 'core/insights/build.gradle.kts'), 'plugins {}\n');
+        const kept = await backendProblems(dir, SHOWCASE_INPUT);
+        assert.ok(!kept.some((p) => /FirebaseCore/.test(p)), kept.join('\n'));
+    });
+});
+
 test('a custom module named api or auth is not backend residue (backend)', async () => {
     await withProject(async (dir) => {
         const input = { ...BACKEND_INPUT(false), features: ['api', 'auth'] };
@@ -1643,5 +1671,117 @@ test('checkServerImage FAIL: the last five stderr lines, joined with | (backend)
         } finally {
             await fs.remove(tools);
         }
+    });
+});
+
+// Insights: core/insights, its iOS bridge and the Crashlytics and Analytics products exactly when the flag is on
+// (showcase: when its template has core/insights); with core/about, the privacy manifest declares its data then
+const INSIGHTS_INPUT = (insights, extra = {}) => ({ ...INPUT, featuresConfig: { theming: false, multiLang: false, insights, ...extra } });
+const INSIGHTS_FILES = ['core/insights/build.gradle.kts', `shared/src/iosMain/kotlin/${PKG}/InsightsBridgeRegistration.kt`,
+    'iosApp/iosApp/InsightsBridge.swift'];
+const PBXPROJ = 'iosApp/iosApp.xcodeproj/project.pbxproj';
+
+async function seedInsights(dir) {
+    for (const rel of INSIGHTS_FILES) await fs.outputFile(path.join(dir, rel), '// insights\n');
+    await fs.appendFile(path.join(dir, 'settings.gradle.kts'), 'include(":core:insights")\n');
+    await fs.outputFile(path.join(dir, PBXPROJ), '/* FirebaseCrashlytics */\n/* FirebaseAnalytics */\n');
+}
+
+// A rendered manifest with the insights block's declarations added to its collected data types
+async function withInsightsData(manifest) {
+    const fixture = await fs.readFile(path.join(PRIVACY_FIXTURES, 'PrivacyInfo.insights.xcprivacy'), 'utf8');
+    const block = fixture.match(/<!-- cmpose:insights -->\n([\s\S]*?)[ \t]*<!-- \/cmpose:insights -->/)[1];
+    const empty = '<key>NSPrivacyCollectedDataTypes</key>\n    <array/>';
+    if (manifest.includes(empty)) return manifest.replace(empty, `<key>NSPrivacyCollectedDataTypes</key>\n    <array>\n${block}    </array>`);
+    return manifest.replace('\n    </array>\n    <key>NSPrivacyAccessedAPITypes', `\n${block.trimEnd()}\n    </array>\n    <key>NSPrivacyAccessedAPITypes`);
+}
+
+test('blank insights on with its module, bridge and products passes, and off without them (insights)', async () => {
+    await withProject(async (dir) => {
+        await seedValid(dir, INSIGHTS_INPUT(true));
+        await seedInsights(dir);
+        await verifyGeneratedProject(dir, INSIGHTS_INPUT(true));
+    });
+    await withProject(async (dir) => {
+        await seedValid(dir, INSIGHTS_INPUT(false));
+        await verifyGeneratedProject(dir, INSIGHTS_INPUT(false));
+    });
+});
+
+test('verifier fails a project whose insights module is missing while the flag is on', async () => {
+    await withProject(async (dir) => {
+        await seedValid(dir, INSIGHTS_INPUT(true));
+        await assert.rejects(verifyGeneratedProject(dir, INSIGHTS_INPUT(true)), (err) => {
+            for (const expected of [
+                'core/insights: missing although insights is on',
+                'settings.gradle.kts: :core:insights not included',
+                `shared/src/iosMain/kotlin/${PKG}/InsightsBridgeRegistration.kt: missing although insights is on`,
+                'iosApp/iosApp/InsightsBridge.swift: missing although insights is on',
+                `${PBXPROJ}: FirebaseCrashlytics not linked although insights is on`,
+                `${PBXPROJ}: FirebaseAnalytics not linked although insights is on`
+            ]) assert.ok(err.message.includes(expected), `${expected} in\n${err.message}`);
+            return true;
+        });
+    });
+});
+
+test('blank insights off: a left module, bridge file or product is rejected (insights)', async () => {
+    await withProject(async (dir) => {
+        await seedValid(dir, INSIGHTS_INPUT(false));
+        await seedInsights(dir);
+        await assert.rejects(verifyGeneratedProject(dir, INSIGHTS_INPUT(false)), (err) => {
+            for (const expected of [
+                'core/insights: present although insights is off',
+                `shared/src/iosMain/kotlin/${PKG}/InsightsBridgeRegistration.kt: present although insights is off`,
+                'iosApp/iosApp/InsightsBridge.swift: present although insights is off',
+                `${PBXPROJ}: FirebaseCrashlytics linked although insights is off`,
+                `${PBXPROJ}: FirebaseAnalytics linked although insights is off`
+            ]) assert.ok(err.message.includes(expected), `${expected} in\n${err.message}`);
+            return true;
+        });
+    });
+});
+
+test('showcase declares insights in the privacy manifest exactly when its template has core/insights (store-ready)', async () => {
+    const all = await privacyFixture(true, true);
+    await withProject(async (dir) => {
+        await seedValid(dir, SHOWCASE_INPUT);
+        await seedAbout(dir, SHOWCASE_INPUT);
+        // An older template: no core/insights, no insights data
+        await verifyGeneratedProject(dir, SHOWCASE_INPUT);
+        await fs.writeFile(path.join(dir, PRIVACY), await withInsightsData(all));
+        await assert.rejects(verifyGeneratedProject(dir, SHOWCASE_INPUT),
+            new RegExp(`${PRIVACY}: crash data declared although insights is off`));
+        await seedInsights(dir);
+        await verifyGeneratedProject(dir, SHOWCASE_INPUT);
+        await fs.writeFile(path.join(dir, PRIVACY), all);
+        await assert.rejects(verifyGeneratedProject(dir, SHOWCASE_INPUT),
+            new RegExp(`${PRIVACY}: crash data not declared although insights is on`));
+    });
+});
+
+test('blank ads off, insights on: the insights device ID is not ad data, ad data still is (store-ready)', async () => {
+    const input = INSIGHTS_INPUT(true, { ads: false, purchases: false });
+    await withProject(async (dir) => {
+        await seedValid(dir, input);
+        await seedAbout(dir, input, { ads: false, purchases: false });
+        await seedInsights(dir);
+        await fs.writeFile(path.join(dir, PRIVACY), await withInsightsData(await privacyFixture(false, false)));
+        await verifyGeneratedProject(dir, input);
+        await fs.writeFile(path.join(dir, PRIVACY), await withInsightsData(await privacyFixture(true, false)));
+        await assert.rejects(verifyGeneratedProject(dir, input), new RegExp(`${PRIVACY}: ad data declared although ads is off`));
+    });
+});
+
+test('blank insights off: crash or analytics data declared is rejected (store-ready)', async () => {
+    const input = INSIGHTS_INPUT(false, { ads: false, purchases: false });
+    await withProject(async (dir) => {
+        await seedValid(dir, input);
+        await seedAbout(dir, input, { ads: false, purchases: false });
+        await fs.writeFile(path.join(dir, PRIVACY), await withInsightsData(await privacyFixture(false, false)));
+        await assert.rejects(verifyGeneratedProject(dir, input), (err) => {
+            assert.ok(err.message.includes(`${PRIVACY}: crash data declared although insights is off`), err.message);
+            return true;
+        });
     });
 });

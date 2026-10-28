@@ -54,18 +54,11 @@ function removeSwiftPackage(content, repositoryUrl) {
 }
 
 function removeSwiftPackageLf(content, repositoryUrl) {
-    const wanted = normalizeRepositoryUrl(repositoryUrl);
     const lines = content.split('\n');
     const objects = parseObjects(lines);
 
     // 1. The package reference(s) with this URL
-    const references = new Set(objects
-        .filter((object) => isa(object) === 'XCRemoteSwiftPackageReference')
-        .filter((object) => {
-            const url = object.text.match(/\brepositoryURL = "?([^";\n]+)"?;/);
-            return url && normalizeRepositoryUrl(url[1]) === wanted;
-        })
-        .map((object) => object.id));
+    const references = packageReferences(objects, repositoryUrl);
     if (references.size === 0) return content;
 
     // 2. The products of that package
@@ -77,17 +70,41 @@ function removeSwiftPackageLf(content, repositoryUrl) {
         })
         .map((object) => object.id));
 
-    // 3. The build files linking those products
-    const buildFiles = new Set(objects
+    // 3. The build files linking those products, then 4.-6. below
+    let result = removeObjects(lines, objects, new Set([...references, ...products, ...linkingBuildFiles(objects, products)]));
+
+    // 7. The project's packageReferences list, when it is now empty. A target's empty
+    // packageProductDependencies list stays: Xcode writes it for every target.
+    result = result.replace(/\n\t\t\tpackageReferences = \(\n\t\t\t\);(?=\n)/g, '');
+
+    return result;
+}
+
+// The XCRemoteSwiftPackageReference ids whose repository is `repositoryUrl`
+function packageReferences(objects, repositoryUrl) {
+    const wanted = normalizeRepositoryUrl(repositoryUrl);
+    return new Set(objects
+        .filter((object) => isa(object) === 'XCRemoteSwiftPackageReference')
+        .filter((object) => {
+            const url = object.text.match(/\brepositoryURL = "?([^";\n]+)"?;/);
+            return url && normalizeRepositoryUrl(url[1]) === wanted;
+        })
+        .map((object) => object.id));
+}
+
+// The PBXBuildFile objects that link one of `products`
+function linkingBuildFiles(objects, products) {
+    return objects
         .filter((object) => isa(object) === 'PBXBuildFile')
         .filter((object) => {
             const ref = object.text.match(/\bproductRef = ([0-9A-F]{24})\b/);
             return ref && products.has(ref[1]);
         })
-        .map((object) => object.id));
+        .map((object) => object.id);
+}
 
-    const removed = new Set([...references, ...products, ...buildFiles]);
-
+// Drops the objects whose id is in `removed`, the list entries naming them and the sections left empty
+function removeObjects(lines, objects, removed) {
     // 4. Their objects
     const drop = new Set();
     for (const object of objects) {
@@ -102,16 +119,54 @@ function removeSwiftPackageLf(content, repositoryUrl) {
         if (match && removed.has(match[1])) drop.add(i);
     });
 
-    let result = lines.filter((_, i) => !drop.has(i)).join('\n');
-
     // 6. Sections left empty, with the blank line that separated them
-    result = result.replace(/\n\n\/\* Begin (\w+) section \*\/\n\/\* End \1 section \*\/(?=\n)/g, '');
-
-    // 7. The project's packageReferences list, when it is now empty. A target's empty
-    // packageProductDependencies list stays: Xcode writes it for every target.
-    result = result.replace(/\n\t\t\tpackageReferences = \(\n\t\t\t\);(?=\n)/g, '');
-
-    return result;
+    return lines.filter((_, i) => !drop.has(i)).join('\n')
+        .replace(/\n\n\/\* Begin (\w+) section \*\/\n\/\* End \1 section \*\/(?=\n)/g, '');
 }
 
-module.exports = { removeSwiftPackage, parseObjects, isa };
+// Removes one product of a Swift package (its XCSwiftPackageProductDependency, the PBXBuildFile linking it
+// and the list entries naming them); the package itself and its other products stay
+function removeSwiftPackageProduct(content, repositoryUrl, productName) {
+    const crlf = content.includes('\r\n');
+    const lf = crlf ? content.replace(/\r\n/g, '\n') : content;
+    const lines = lf.split('\n');
+    const objects = parseObjects(lines);
+    const references = packageReferences(objects, repositoryUrl);
+    const products = new Set(objects
+        .filter((object) => isa(object) === 'XCSwiftPackageProductDependency')
+        .filter((object) => {
+            const pkg = object.text.match(/\bpackage = ([0-9A-F]{24})\b/);
+            const name = object.text.match(/\bproductName = "?([^";\n]+)"?;/);
+            return pkg && references.has(pkg[1]) && name && name[1] === productName;
+        })
+        .map((object) => object.id));
+    const result = products.size === 0 ? lf
+        : removeObjects(lines, objects, new Set([...products, ...linkingBuildFiles(objects, products)]));
+    // The comment Xcode writes on the build file: still there means a link it could not parse
+    if (result.includes(`/* ${productName} in Frameworks */`)) {
+        throw new Error(`removeSwiftPackageProduct: ${productName} is in project.pbxproj but its objects could not be parsed (unexpected formatting)`);
+    }
+    if (products.size === 0) return content;
+    return crlf ? result.replace(/\n/g, '\r\n') : result;
+}
+
+// Removes the run script phase(s) named `name` (PBXShellScriptBuildPhase) and the list entries naming them; a
+// phase it finds by name and cannot take out is an error
+function removeRunScriptPhase(content, name) {
+    const crlf = content.includes('\r\n');
+    const lines = (crlf ? content.replace(/\r\n/g, '\n') : content).split('\n');
+    const nameLine = `name = ${JSON.stringify(name)};`;
+    const phases = parseObjects(lines).filter((object) => isa(object) === 'PBXShellScriptBuildPhase' && object.text.includes(nameLine));
+    // One object per isa: a phase whose closing line is missing would swallow the next object
+    if (phases.some((object) => (object.text.match(/\bisa = /g) || []).length !== 1)) {
+        throw new Error(`removeRunScriptPhase: "${name}" could not be parsed (unexpected formatting)`);
+    }
+    const result = phases.length === 0 ? lines.join('\n') : removeObjects(lines, phases, new Set(phases.map((object) => object.id)));
+    if (result.includes(nameLine) || result.includes(`/* ${name} */`)) {
+        throw new Error(`removeRunScriptPhase: "${name}" is in project.pbxproj but could not be removed (unexpected formatting)`);
+    }
+    if (phases.length === 0) return content;
+    return crlf ? result.replace(/\n/g, '\r\n') : result;
+}
+
+module.exports = { removeSwiftPackage, removeSwiftPackageProduct, removeRunScriptPhase, parseObjects, isa };
