@@ -9,7 +9,7 @@ const GAME_SCHEMA = Object.freeze({
     unityVersion: '6000.3.25f1',
     templateTypes: ['showcase', 'blank'],
     renders: ['2d', '3d'],
-    flags: ['saveSystem', 'uiTheme', 'multiLang', 'network', 'networkInspector', 'purchases', 'ads', 'leaderboards'],
+    flags: ['saveSystem', 'uiTheme', 'multiLang', 'network', 'networkInspector', 'purchases', 'ads', 'leaderboards', 'insights'],
     flagRequires: { networkInspector: ['network'] },
     idGroups: {
         admob: { flag: 'ads', fields: ['androidAppId', 'iosAppId', 'androidBanner', 'androidInterstitial', 'androidRewarded', 'iosBanner', 'iosInterstitial', 'iosRewarded'] },
@@ -25,7 +25,7 @@ const GAME_SCHEMA = Object.freeze({
     reservedModuleNames: ['sample', 'shell', 'showcase', 'build',
         'game', 'action', 'i', 'bonus', 'leaderboard',
         'button', 'lifetime', 'object', 'preserve', 'resources', 'serializable', 'transform',
-        'about', 'ads', 'boot', 'common', 'guide', 'inspector', 'leaderboards', 'menu', 'network', 'pause',
+        'about', 'ads', 'boot', 'common', 'guide', 'insights', 'inspector', 'leaderboards', 'menu', 'network', 'pause',
         'purchases', 'runner2d', 'settings', 'theme', 'track3d', 'update'],
     reservedPackagePrefix: 'com.kturker',
     // The theme request's fields; the families themselves come from the template (game_describe themes)

@@ -29,6 +29,9 @@ function gameWarnings(value) {
     if (on('leaderboards') && !value.ids.gameServices) {
         warnings.push('Leaderboard and achievement IDs are placeholders: game services stay off until you set them.');
     }
+    if (on('insights')) {
+        warnings.push('Crashlytics and Analytics stay off until you add google-services.json and GoogleService-Info.plist to Assets/Firebase (see README).');
+    }
     warnings.push(`Open the project with Unity ${GAME_SCHEMA.unityVersion} (Android and iOS Build Support); the first import takes a few minutes.`);
     return warnings;
 }

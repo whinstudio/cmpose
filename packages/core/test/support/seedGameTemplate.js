@@ -27,7 +27,8 @@ const EXTRA_FLAGS = {
     network: { define: 'CMPOSE_NETWORK', dir: 'Network', guid: G('f9'), cs: G('fa') },
     networkInspector: { define: 'CMPOSE_NETWORKINSPECTOR', dir: 'NetworkInspector', guid: G('fb'), cs: G('fc'), requires: ['network'] },
     purchases: { define: 'CMPOSE_PURCHASES', dir: 'Purchases', guid: G('fd'), cs: G('fe') },
-    leaderboards: { define: 'CMPOSE_LEADERBOARDS', dir: 'Leaderboards', guid: G('c2'), cs: G('c3') }
+    leaderboards: { define: 'CMPOSE_LEADERBOARDS', dir: 'Leaderboards', guid: G('c2'), cs: G('c3') },
+    insights: { define: 'CMPOSE_INSIGHTS', dir: 'Insights', guid: G('c4'), cs: G('c5') }
 };
 
 const meta = (guid, folder = false) => `fileFormatVersion: 2\nguid: ${guid}\n${folder ? 'folderAsset: yes\n' : ''}`;
