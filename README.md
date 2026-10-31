@@ -12,7 +12,8 @@ It also generates Unity mobile games ("a 2D Unity game called SkyHopper with ads
 leaderboards"): a Unity 6 (URP) Android + iOS project from the pinned game template
 (`whinstudio/cmpose-game-template`), as a `showcase` sample game (2D runner or 3D track) or a
 `blank` game with flags for saving, theming, multi-language, networking, RevenueCat purchases,
-AdMob ads and Play Games / Game Center leaderboards, up to 3 feature modules and your real IDs.
+AdMob ads, Play Games / Game Center leaderboards and insights (Firebase Crashlytics + Analytics),
+up to 3 feature modules and your real IDs.
 
 And it generates a standalone Kotlin/Ktor backend ("a backend called NotesBackend with
 sharing"): Firebase sign-in verified on the server, PostgreSQL with Flyway, file uploads, a

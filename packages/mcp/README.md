@@ -71,8 +71,10 @@ saving, deep links, and in-app review and update check.
   `render: "3d"`) or `blank` (an empty game with the flags you pick). `render` is `2d`
   (default) or `3d`.
 - **Flags for `blank`:** `saveSystem`, `uiTheme`, `multiLang`, `network`, `networkInspector`
-  (needs `network`, added for you), `purchases` (RevenueCat), `ads` (AdMob) and
-  `leaderboards` (Google Play Games and Game Center).
+  (needs `network`, added for you), `purchases` (RevenueCat), `ads` (AdMob),
+  `leaderboards` (Google Play Games and Game Center) and `insights` (Firebase Crashlytics +
+  Analytics; off until you add `google-services.json` and `GoogleService-Info.plist` to
+  `Assets/Firebase`, reported as a warning).
 - **Your own feature modules (`blank`):** up to 3.
 - **IDs:** `ids` takes your real AdMob (`admob`), RevenueCat (`revenueCat`) and Play Games +
   Game Center (`gameServices`) IDs, each group with its flag; `game_describe` lists the fields.

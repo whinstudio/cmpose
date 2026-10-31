@@ -14,11 +14,15 @@ test('defaults for showcase', () => {
     const v = ok(base);
     assert.deepStrictEqual([v.templateType, v.render, v.minSdk, v.iosVersion, v.companyName], ['showcase', '2d', 25, '15.0', 'Acme']);
     assert.ok(!('ci' in v));
-    assert.deepStrictEqual(v.flags, ['saveSystem', 'uiTheme', 'multiLang', 'network', 'networkInspector', 'purchases', 'ads', 'leaderboards']);
+    assert.deepStrictEqual(v.flags, ['saveSystem', 'uiTheme', 'multiLang', 'network', 'networkInspector', 'purchases', 'ads', 'leaderboards', 'insights']);
     assert.deepStrictEqual([v.features, v.ids], [[], {}]);
 });
 test('blank flags: requires are added, order follows the schema', () => {
     assert.deepStrictEqual(ok({ ...base, templateType: 'blank', flags: ['networkInspector', 'ads'] }).flags, ['network', 'networkInspector', 'ads']);
+});
+test('blank accepts insights on its own, without IDs', () => {
+    const v = ok({ ...base, templateType: 'blank', flags: ['insights'] });
+    assert.deepStrictEqual([v.flags, v.ids], [['insights'], {}]);
 });
 test('showcase rejects flags and features', () => {
     bad({ ...base, flags: ['ads'] }, 'flags');
@@ -75,7 +79,7 @@ test('module names whose copy would clash with the template are reserved', () =>
     // (Sample's BonusView/LeaderboardView); a namespace hiding a type the Sample code uses; the template's string-key prefixes
     const reserved = ['game', 'action', 'i', 'bonus', 'leaderboard',
         'button', 'lifetime', 'object', 'preserve', 'resources', 'serializable', 'transform',
-        'about', 'ads', 'boot', 'common', 'guide', 'inspector', 'leaderboards', 'menu', 'network', 'pause',
+        'about', 'ads', 'boot', 'common', 'guide', 'insights', 'inspector', 'leaderboards', 'menu', 'network', 'pause',
         'purchases', 'runner2d', 'settings', 'theme', 'track3d', 'update'];
     for (const name of reserved) bad({ ...b, features: ['shop', name] }, 'features');
     const { describeGame } = require('../src/game/describe');

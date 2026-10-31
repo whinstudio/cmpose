@@ -19,3 +19,11 @@ test('the contract names the theme request fields and their colour format', () =
     assert.ok(theme);
     assert.notStrictEqual(hashContract(withoutTheme), gameContractVersion());
 });
+test('the insights flag is the last flag, a reserved module name and part of the contract hash', () => {
+    assert.deepStrictEqual(GAME_SCHEMA.flags.slice(-2), ['leaderboards', 'insights']);
+    assert.ok(GAME_SCHEMA.reservedModuleNames.includes('insights'));
+    const facts = gameContractFacts();
+    const before = { ...facts, flags: facts.flags.filter((f) => f !== 'insights'),
+        reservedModuleNames: facts.reservedModuleNames.filter((n) => n !== 'insights') };
+    assert.notStrictEqual(hashContract(before), gameContractVersion());
+});

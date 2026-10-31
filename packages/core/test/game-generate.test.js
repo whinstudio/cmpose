@@ -5,7 +5,7 @@ const path = require('path');
 const { seedGameTemplate, THEME_ASSETS } = require('./support/seedGameTemplate');
 const { tmpDir } = require('./support/gameFixtures');
 const { validateGame } = require('../src/game/validate');
-const { generateGame } = require('../src/game/generate');
+const { generateGame, gameWarnings } = require('../src/game/generate');
 const { describeGame } = require('../src/game/describe');
 const { readThemes } = require('../src/game/themes');
 const { GAME_SCHEMA, gameContractFacts, gameContractVersion } = require('../src/game/contract');
@@ -27,6 +27,7 @@ const W = {
     admob: 'Ads use AdMob test IDs: replace them with your own before release.',
     revenueCat: 'Purchases use the RevenueCat Test Store key: replace it before release.',
     gameServices: 'Leaderboard and achievement IDs are placeholders: game services stay off until you set them.',
+    insights: 'Crashlytics and Analytics stay off until you add google-services.json and GoogleService-Info.plist to Assets/Firebase (see README).',
     unity: 'Open the project with Unity 6000.3.25f1 (Android and iOS Build Support); the first import takes a few minutes.'
 };
 
@@ -134,9 +135,14 @@ test('showcase: the sample goes, every flag stays on and the test-id warnings co
     assert.ok(await exists(dir, `${P}/Core/Ads`));
     assert.deepEqual(result.flags, GAME_SCHEMA.flags);
     assert.deepEqual(result.ids, { admob: 'test', revenueCat: 'test', gameServices: 'test' });
-    assert.deepEqual(result.warnings, [W.admob, W.revenueCat, W.gameServices, W.unity]);
+    assert.deepEqual(result.warnings, [W.admob, W.revenueCat, W.gameServices, W.insights, W.unity]);
     // The 2d render layer was applied
     assert.match(await fs.readFile(path.join(dir, `${P}/Scenes/Menu.unity`), 'utf8'), /Menu2D/);
+});
+
+test('gameWarnings: insights on names the Firebase config files, off does not', () => {
+    assert.deepEqual(gameWarnings(value({ templateType: 'blank', flags: ['insights'] })), [W.insights, W.unity]);
+    assert.deepEqual(gameWarnings(value({ templateType: 'blank', flags: ['ads'] })), [W.admob, W.unity]);
 });
 
 test('the same input and time give byte-identical trees', async (t) => {
@@ -178,7 +184,7 @@ test('describeGame states the engine, the pin, the defaults and the contract', (
         themes: { default: null, families: [] },
         contract: gameContractFacts()
     });
-    assert.equal(describeGame().defaults.flags.showcase.length, 8);
+    assert.equal(describeGame().defaults.flags.showcase.length, 9);
 });
 
 test('describeGame lists the template families for a planner: id, title, suits and font pair ids only', async (t) => {
@@ -257,7 +263,7 @@ test('neon with uiTheme on: both palettes are written, the record and result car
     const theme = { family: 'neon', primary: '#E91E63', fontPair: 'chakrapetch-exo2' };
     assert.deepEqual(result.theme, theme);
     assert.deepEqual((await readRecord(dir)).theme, theme);
-    assert.deepEqual(result.warnings, [W.admob, W.revenueCat, W.gameServices, W.unity]);
+    assert.deepEqual(result.warnings, [W.admob, W.revenueCat, W.gameServices, W.insights, W.unity]);
 });
 
 test('uiTheme off: the flag removed Dark.asset and the theme step does not bring it back', async (t) => {
