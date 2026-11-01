@@ -73,6 +73,22 @@ groups, limits and the template's theme families.
 `templateRef`; `backend_describe` lists the rules and the conventions an agent follows when it
 adds code to the generated backend.
 
+## Compatibility
+
+From 1.0.0 the MCP tools follow semantic versioning.
+
+- **Stable in 1.x:** the six tool names; every input field above, its accepted values and its
+  default (the `featuresConfig` keys, the game `flags`, the backend options); the fields of each
+  tool's structured result.
+- **A 1.x release may:** add optional fields, flags or values; accept input an earlier release
+  refused; add warnings; move the pinned templates to newer tags (the release notes say what the
+  generated projects gain).
+- **Needs 2.0:** renaming or removing a field, flag or value; refusing input a 1.x release
+  accepted; changing a default.
+- **Not covered:** the contents of the generated projects (they follow the pinned templates),
+  the text of warnings and errors, and `templateRef` / `backendTemplateRef` pointing at a tag
+  other than the pinned one (accepted as is; an older tag may lack newer options).
+
 ## Develop
 
     npm install
