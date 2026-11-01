@@ -8,11 +8,12 @@ const { applyBackendIdentity } = require('./identity');
 const { writeBackendRecord } = require('./record');
 const { verifyBackendProject } = require('./verifier');
 
-// The template cache's own records and the template's gate and notes never reach the project (tools/deploy-lint.sh stays)
+// The template cache's own records, the template's gate and notes and its LICENSE (the template's, not the user's
+// project's) never reach the project (tools/deploy-lint.sh stays)
 // Added with the sample option: a template without it is older than this generator (an error, never tolerated)
 const SAMPLE_PATHS_FILE = path.join('tools', 'sample-paths.txt');
 
-const LEFTOVERS = ['.git', COMMIT_FILE_NAME, REF_FILE_NAME, path.join('tools', 'gate.sh'), path.join('tools', 'TEMPLATE.md')];
+const LEFTOVERS = ['.git', COMMIT_FILE_NAME, REF_FILE_NAME, 'LICENSE', path.join('tools', 'gate.sh'), path.join('tools', 'TEMPLATE.md')];
 
 // Turns a fresh backend template copy (projectDir) into the requested project, in place. value: validateBackend().value.
 // templateRef and templateCommit default to the cache's markers. Throws when a step fails or the result fails verification.
