@@ -25,12 +25,13 @@ for (const [sharing, sample] of [[false, true], [true, true], [true, false], [fa
         await fs.writeFile(path.join(projectDir, '.template-ref'), 'backend-template-test\n');
         await fs.writeFile(path.join(projectDir, '.template-commit'), 'abc1234\n');
         await fs.ensureDir(path.join(projectDir, '.git'));
+        await fs.writeFile(path.join(projectDir, 'LICENSE'), 'MIT License\n');
         const value = valueOf({ sharing, sample });
         const now = new Date('2026-10-17T12:00:00Z');
         const result = await generateBackend(value, { projectDir, generatorVersion: 'test', now });
 
         assert.deepEqual(await verifyBackendProject(projectDir, value), []);
-        for (const gone of ['.git', '.template-ref', '.template-commit', 'tools/gate.sh', 'tools/sharing-paths.txt', 'tools/sample-paths.txt',
+        for (const gone of ['.git', '.template-ref', '.template-commit', 'LICENSE', 'tools/gate.sh', 'tools/sharing-paths.txt', 'tools/sample-paths.txt',
             'tools/resolve-markers.sh',
             'tools/resolve-markers.test.sh', 'tools/TEMPLATE.md']) {
             assert.equal(await exists(projectDir, gone), false, gone);
