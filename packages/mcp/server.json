@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Keremturker/cmpose",
   "title": "cmpose",
-  "description": "Generate buildable Compose Multiplatform and Unity game projects locally from tested templates.",
+  "description": "Generate Compose Multiplatform apps, Unity games and Ktor backends locally from tested templates.",
   "websiteUrl": "https://github.com/whinstudio/cmpose",
   "repository": {
     "url": "https://github.com/whinstudio/cmpose",
@@ -10,12 +10,12 @@
     "id": "1418016719",
     "subfolder": "packages/mcp"
   },
-  "version": "0.8.9",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@cmpose/mcp",
-      "version": "0.8.9",
+      "version": "1.0.0",
       "transport": { "type": "stdio" }
     }
   ]
