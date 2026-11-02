@@ -21,7 +21,7 @@ test('reads the seeded families', async () => {
     const clean = t.families.find((f) => f.id === 'clean');
     assert.strictEqual(clean.title, 'Clean');
     assert.strictEqual(clean.light.Primary, '#2D68EC');
-    assert.strictEqual(clean.dark.Primary, '#5586EF');
+    assert.ok(!('dark' in clean));
     assert.strictEqual(clean.style.cornerRadius, 20);
     assert.deepStrictEqual(clean.fontPairs.map((p) => p.id), ['outfit-inter', 'montserrat-inter']);
     assert.match(clean.fontPairs[0].display, /Outfit-Bold SDF\.asset$/);
@@ -33,6 +33,16 @@ test('a template without themes.json has no families', async () => {
     assert.strictEqual(t.default, null);
 });
 
+test('a family that still carries a dark palette is accepted and the dark palette is dropped', async () => {
+    const dir = await seedGameTemplate(tmp());
+    const light = { Background: '#FFFFFF', Primary: '#2D68EC' };
+    const family = { id: 'a', light, dark: { Background: '#000000' }, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] };
+    await fs.outputFile(path.join(dir, THEMES_PATH), JSON.stringify({ version: 1, default: 'a', families: [family] }));
+    const [read] = (await readThemes(dir)).families;
+    assert.deepStrictEqual(read.light, light);
+    assert.ok(!('dark' in read));
+});
+
 test('a broken themes.json fails closed', async () => {
     const dir = await seedGameTemplate(tmp());
     const file = path.join(dir, THEMES_PATH);
@@ -41,9 +51,9 @@ test('a broken themes.json fails closed', async () => {
     for (const bad of [
         { version: 1, default: 'clean', families: 'x' },
         { version: 1, default: 'missing', families: [] },
-        { version: 1, default: 'a', families: [{ id: 'a', light: {}, dark: {}, style: {}, fontPairs: [] }] },
-        { version: 1, default: 'a', families: [{ id: 'a', light: { Primary: 'blue' }, dark: {}, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] }] },
-        { version: 1, default: 'a', families: [{ id: 'a', light: {}, dark: {}, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] }, { id: 'a', light: {}, dark: {}, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] }] }
+        { version: 1, default: 'a', families: [{ id: 'a', light: {}, style: {}, fontPairs: [] }] },
+        { version: 1, default: 'a', families: [{ id: 'a', light: { Primary: 'blue' }, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] }] },
+        { version: 1, default: 'a', families: [{ id: 'a', light: {}, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] }, { id: 'a', light: {}, style: {}, fontPairs: [{ id: 'p', display: 'd', body: 'b' }] }] }
     ]) {
         await fs.outputFile(file, JSON.stringify(bad));
         await assert.rejects(readThemes(dir), /themes\.json/, JSON.stringify(bad));

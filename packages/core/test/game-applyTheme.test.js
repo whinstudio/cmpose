@@ -44,22 +44,21 @@ test('Unity floats: the shortest text of the 32-bit value, as Unity writes it', 
     assert.equal(unityColor('#00000099'), '{r: 0, g: 0, b: 0, a: 0.6}');
 });
 
-test('the default family on the template: the three assets stay byte-identical', async (t) => {
+test('the default family on the template: the two assets stay byte-identical', async (t) => {
     const { dir, themes } = await seeded(t);
     const before = await Promise.all(Object.values(THEME_ASSETS).map((rel) => read(dir, rel)));
-    const result = await applyTheme(dir, theme(themes, undefined), themes, { uiTheme: true });
+    const result = await applyTheme(dir, theme(themes, undefined), themes);
     assert.deepEqual(result, { warnings: [], theme: { family: 'clean', fontPair: 'outfit-inter' } });
     assert.deepEqual(await Promise.all(Object.values(THEME_ASSETS).map((rel) => read(dir, rel))), before);
 });
 
-test('neon with the second font pair and uiTheme: both palettes, the fonts, post and style are written', async (t) => {
+test('neon with the second font pair: the palette, the fonts, post and style are written', async (t) => {
     const { dir, themes } = await seeded(t);
     const neon = themes.families.find((f) => f.id === 'neon');
-    const result = await applyTheme(dir, theme(themes, { family: 'neon', fontPair: 'outfit-exo2' }), themes, { uiTheme: true });
+    const result = await applyTheme(dir, theme(themes, { family: 'neon', fontPair: 'outfit-exo2' }), themes);
     assert.deepEqual(result, { warnings: [], theme: { family: 'neon', fontPair: 'outfit-exo2' } });
 
     assert.deepEqual(paletteOf(await read(dir, THEME_ASSETS.light), neon.light), neon.light);
-    assert.deepEqual(paletteOf(await read(dir, THEME_ASSETS.dark), neon.dark), neon.dark);
     const style = await read(dir, THEME_ASSETS.style);
     const ref = (rel) => `{fileID: 11400000, guid: ${GUIDS[rel]}, type: 2}`;
     assert.equal(getScalar(style, 'familyId'), 'neon');
@@ -78,32 +77,29 @@ test('neon with the second font pair and uiTheme: both palettes, the fonts, post
     assert.match(style, /^  m_Script: \{fileID: 11500000, guid: 83edc961561242848ac4b6707b78488e, type: 3\}$/m);
 });
 
-test('uiTheme off: the flag removed Dark.asset and applyTheme never recreates it', async (t) => {
+test('a family applies without any dark palette asset', async (t) => {
     const { dir, themes } = await seeded(t);
-    await fs.remove(path.join(dir, 'Assets/_Project/Core/Theme'));
-    await applyTheme(dir, theme(themes, { family: 'bold' }), themes, { uiTheme: false });
-    assert.equal(await fs.pathExists(path.join(dir, THEME_ASSETS.dark)), false);
+    await applyTheme(dir, theme(themes, { family: 'bold' }), themes);
+    assert.equal(await fs.pathExists(path.join(dir, 'Assets/_Project/Core/Theme')), false);
     assert.equal(getScalar(await read(dir, THEME_ASSETS.style), 'familyId'), 'bold');
 });
 
-test('primary and accent shifts land in both palettes and pass every floor', async (t) => {
+test('primary and accent shifts land in the palette and pass every floor', async (t) => {
     const { dir, themes } = await seeded(t);
-    const result = await applyTheme(dir, theme(themes, { primary: '#E91E63', accent: '#FFFF00' }), themes, { uiTheme: true });
+    const result = await applyTheme(dir, theme(themes, { primary: '#E91E63', accent: '#FFFF00' }), themes);
     assert.deepEqual(result, { warnings: [], theme: { family: 'clean', primary: '#E91E63', accent: '#FFFF00', fontPair: 'outfit-inter' } });
     const clean = themes.families.find((f) => f.id === 'clean');
-    for (const [mode, rel] of [['light', THEME_ASSETS.light], ['dark', THEME_ASSETS.dark]]) {
-        const palette = paletteOf(await read(dir, rel), clean[mode]);
-        assert.notEqual(palette.Primary, clean[mode].Primary, mode);
-        assert.deepEqual(paletteProblems(palette, mode), [], mode);
-    }
+    const palette = paletteOf(await read(dir, THEME_ASSETS.light), clean.light);
+    assert.notEqual(palette.Primary, clean.light.Primary);
+    assert.deepEqual(paletteProblems(palette, 'light'), []);
 });
 
 test('a colour that falls back: a warning, and the record leaves it out', async (t) => {
     const { dir, themes } = await seeded(t);
     const grey = Object.fromEntries(Object.keys(themes.families[0].light).map((role) => [role, '#777777']));
     const clean = themes.families.find((f) => f.id === 'clean');
-    const greyThemes = { ...themes, families: [{ ...clean, light: grey, dark: grey }] };
-    const result = await applyTheme(dir, theme(greyThemes, { primary: '#E91E63' }), greyThemes, { uiTheme: false });
+    const greyThemes = { ...themes, families: [{ ...clean, light: grey }] };
+    const result = await applyTheme(dir, theme(greyThemes, { primary: '#E91E63' }), greyThemes);
     assert.deepEqual(result, {
         warnings: ['theme: Primary fell back to the family default in the light palette'],
         theme: { family: 'clean', fontPair: 'outfit-inter' }
@@ -115,9 +111,9 @@ test('nothing is written when a font, profile or asset is missing, or a style va
     const neon = themes.families.find((f) => f.id === 'neon');
     const before = await read(dir, THEME_ASSETS.light);
     await fs.remove(path.join(dir, `${neon.fontPairs[0].display}.meta`));
-    await assert.rejects(applyTheme(dir, theme(themes, { family: 'neon' }), themes, { uiTheme: true }), /theme: display font .* is missing/);
+    await assert.rejects(applyTheme(dir, theme(themes, { family: 'neon' }), themes), /theme: display font .* is missing/);
     await fs.remove(path.join(dir, neon.style.post));
-    await assert.rejects(applyTheme(dir, theme(themes, { family: 'neon', fontPair: 'outfit-exo2' }), themes, { uiTheme: true }),
+    await assert.rejects(applyTheme(dir, theme(themes, { family: 'neon', fontPair: 'outfit-exo2' }), themes),
         /theme: post profile .* is missing/);
     assert.equal(await read(dir, THEME_ASSETS.light), before);
 
@@ -132,7 +128,4 @@ test('nothing is written when a font, profile or asset is missing, or a style va
     await assert.rejects(applyTheme(dir, cv, cleanWith({ post: 'Assets/../../x.asset' }), {}), /post profile must be a path inside Assets/);
     assert.equal(await read(dir, THEME_ASSETS.light), before);
 
-    await fs.remove(path.join(dir, THEME_ASSETS.dark));
-    await assert.rejects(applyTheme(dir, cv, themes, { uiTheme: true }), /Dark\.asset is missing/);
-    assert.equal(await read(dir, THEME_ASSETS.light), before);
 });

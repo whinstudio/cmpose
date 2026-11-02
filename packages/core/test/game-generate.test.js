@@ -184,7 +184,7 @@ test('describeGame states the engine, the pin, the defaults and the contract', (
         themes: { default: null, families: [] },
         contract: gameContractFacts()
     });
-    assert.equal(describeGame().defaults.flags.showcase.length, 9);
+    assert.equal(describeGame().defaults.flags.showcase.length, 8);
 });
 
 test('describeGame lists the template families for a planner: id, title, suits and font pair ids only', async (t) => {
@@ -252,7 +252,7 @@ test('no theme asked: the template default (clean) is applied, its three assets 
     assert.ok(await exists(dir, '.cmpose/themes.json'));
 });
 
-test('neon with uiTheme on: both palettes are written, the record and result carry the theme', async (t) => {
+test('neon: the palette and style are written, the record and result carry the theme', async (t) => {
     const dir = await seeded(t, { themes: true });
     const before = await themeAssets(dir);
     const v = value({ templateType: 'showcase', theme: { family: 'neon', primary: '#e91e63' } });
@@ -266,12 +266,10 @@ test('neon with uiTheme on: both palettes are written, the record and result car
     assert.deepEqual(result.warnings, [W.admob, W.revenueCat, W.gameServices, W.insights, W.unity]);
 });
 
-test('uiTheme off: the flag removed Dark.asset and the theme step does not bring it back', async (t) => {
+test('a blank project with a theme: the style is applied and no dark palette is created', async (t) => {
     const dir = await seeded(t, { themes: true });
     const result = await generateGame(value({ templateType: 'blank', flags: [], theme: { family: 'bold' } }),
         { projectDir: dir, template: TEMPLATE, coreVersion: '0.2.0', now: NOW });
-    assert.equal(await exists(dir, THEME_ASSETS.dark), false);
-    assert.equal(await exists(dir, `${P}/Core/Theme`), false);
     assert.match(await fs.readFile(path.join(dir, THEME_ASSETS.style), 'utf8'), /^  familyId: bold$/m);
     assert.equal(result.theme.family, 'bold');
 });

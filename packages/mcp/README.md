@@ -70,7 +70,7 @@ saving, deep links, and in-app review and update check.
 - **Template:** `showcase` (a sample game with every flag on: a 2D runner, or a 3D track with
   `render: "3d"`) or `blank` (an empty game with the flags you pick). `render` is `2d`
   (default) or `3d`.
-- **Flags for `blank`:** `saveSystem`, `uiTheme`, `multiLang`, `network`, `networkInspector`
+- **Flags for `blank`:** `saveSystem`, `multiLang`, `network`, `networkInspector`
   (needs `network`, added for you), `purchases` (RevenueCat), `ads` (AdMob),
   `leaderboards` (Google Play Games and Game Center) and `insights` (Firebase Crashlytics +
   Analytics; off until you add `google-services.json` and `GoogleService-Info.plist` to

@@ -6,10 +6,9 @@ const { readMetaGuid } = require('./guid');
 const { hexToRgb, derivePalette } = require('./themeColors');
 
 // cmpose game: writes a style family (themes.js) into the project as ThemeFamilies.Apply does in the editor: the light
-// palette, the dark one while the uiTheme flag's folder is there, and the style asset (fonts, shapes, motion, post,
-// world colours). Values are written the way Unity serializes them, so applying the template's own family changes nothing.
+// palette and the style asset (fonts, shapes, motion, post, world colours). Values are written the way Unity serializes
+// them, so applying the template's own family changes nothing.
 const LIGHT_PATH = 'Assets/_Project/Core/Presentation/Resources/Theme/Light.asset';
-const DARK_PATH = 'Assets/_Project/Core/Theme/Resources/Theme/Dark.asset';
 const STYLE_PATH = 'Assets/_Project/Core/Presentation/Resources/Theme/Style.asset';
 const ASSET_DOC = { classId: 114, fileId: 11400000 };
 
@@ -71,10 +70,9 @@ async function readAsset(projectDir, rel) {
 }
 
 /** Writes themeValue (validateTheme().value: family, fontPair, primary?, accent?) of themes (readThemes) into
- * projectDir. uiTheme: whether the flag is on (its Dark.asset is written, never created). Every asset is read and every
- * reference resolved before anything is written. Returns the warnings of colours that fell back and the theme as
- * applied (primary/accent only where they were kept). */
-async function applyTheme(projectDir, themeValue, themes, { uiTheme = false } = {}) {
+ * projectDir. Every asset is read and every reference resolved before anything is written. Returns the warnings of
+ * colours that fell back and the theme as applied (primary/accent only where they were kept). */
+async function applyTheme(projectDir, themeValue, themes) {
     const family = themes.families.find((f) => f.id === themeValue.family);
     if (!family) throw new Error('theme: unknown family');
     const pair = family.fontPairs.find((p) => p.id === themeValue.fontPair);
@@ -82,8 +80,7 @@ async function applyTheme(projectDir, themeValue, themes, { uiTheme = false } = 
     const style = family.style;
 
     const requested = { primary: themeValue.primary, accent: themeValue.accent };
-    const light = derivePalette(family, requested, 'light');
-    const dark = uiTheme ? derivePalette(family, requested, 'dark') : null;
+    const light = derivePalette(family, requested);
 
     const display = await assetRef(projectDir, pair.display, 'display font');
     const body = await assetRef(projectDir, pair.body, 'body font');
@@ -99,7 +96,6 @@ async function applyTheme(projectDir, themeValue, themes, { uiTheme = false } = 
     const enums = Object.fromEntries(Object.keys(ENUMS).map((k) => [k, enumIndex(k, style[k])]));
 
     const lightText = writePalette(await readAsset(projectDir, LIGHT_PATH), light.roles);
-    const darkText = dark ? writePalette(await readAsset(projectDir, DARK_PATH), dark.roles) : null;
     let styleText = await readAsset(projectDir, STYLE_PATH);
     const scalars = [
         ['familyId', family.id], ['displayFont', display], ['bodyFont', body],
@@ -110,10 +106,9 @@ async function applyTheme(projectDir, themeValue, themes, { uiTheme = false } = 
     styleText = setList(styleText, 'worldColors', worldColors.map(unityColor), { doc: ASSET_DOC });
 
     await fs.writeFile(path.join(projectDir, LIGHT_PATH), lightText);
-    if (darkText !== null) await fs.writeFile(path.join(projectDir, DARK_PATH), darkText);
     await fs.writeFile(path.join(projectDir, STYLE_PATH), styleText);
 
-    const warnings = [...light.warnings, ...(dark ? dark.warnings : [])];
+    const warnings = light.warnings;
     const fellBack = (role) => warnings.some((w) => w.startsWith(`theme: ${role} `));
     return {
         warnings,
@@ -126,4 +121,4 @@ async function applyTheme(projectDir, themeValue, themes, { uiTheme = false } = 
     };
 }
 
-module.exports = { LIGHT_PATH, DARK_PATH, STYLE_PATH, unityFloat, unityColor, applyTheme };
+module.exports = { LIGHT_PATH, STYLE_PATH, unityFloat, unityColor, applyTheme };

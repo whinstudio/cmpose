@@ -41,7 +41,6 @@ test('the real template generates blank with every flag, two modules, and verifi
 // The real template's committed theme assets and its style families
 const THEME_FILES = [
     'Assets/_Project/Core/Presentation/Resources/Theme/Light.asset',
-    'Assets/_Project/Core/Theme/Resources/Theme/Dark.asset',
     'Assets/_Project/Core/Presentation/Resources/Theme/Style.asset'
 ];
 
@@ -57,7 +56,7 @@ async function generateReal(t, request) {
     return { dir, result };
 }
 
-test('the real template without a theme: clean, the three theme assets as committed (bar the namespace)', REAL ? {} : { skip: 'CMP_GAME_TEMPLATE_DIR not set' }, async (t) => {
+test('the real template without a theme: clean, the two theme assets as committed (bar the namespace)', REAL ? {} : { skip: 'CMP_GAME_TEMPLATE_DIR not set' }, async (t) => {
     const { dir, result } = await generateReal(t, { templateType: 'showcase' });
     assert.deepEqual(result.theme, { family: 'clean', fontPair: 'outfit-inter' });
     for (const rel of THEME_FILES) {
@@ -80,21 +79,18 @@ test('the real template takes every family and font pair, with shifted colours, 
         for (const pair of family.fontPairs) {
             const v = validateTheme({ family: family.id, fontPair: pair.id, primary: '#E91E63' }, themes);
             assert.ok(v.ok, v.error);
-            const applied = await applyTheme(dir, v.value, themes, { uiTheme: true });
+            const applied = await applyTheme(dir, v.value, themes);
             assert.deepEqual(applied.warnings, [], `${family.id} ${pair.id}`);
-            const style = await fs.readFile(path.join(dir, THEME_FILES[2]), 'utf8');
+            const style = await fs.readFile(path.join(dir, THEME_FILES[1]), 'utf8');
             assert.match(style, new RegExp(`^  familyId: ${family.id}$`, 'm'));
         }
     }
     assert.deepEqual(await verifyGameProject(dir), []);
 });
 
-test('the real template with uiTheme off: no Dark.asset, a themed light palette', REAL ? {} : { skip: 'CMP_GAME_TEMPLATE_DIR not set' }, async (t) => {
-    const { dir, result } = await generateReal(t, {
-        templateType: 'blank', flags: GAME_SCHEMA.flags.filter((f) => f !== 'uiTheme'), theme: { family: 'pastel' }
-    });
+test('the real template, blank: a themed light palette', REAL ? {} : { skip: 'CMP_GAME_TEMPLATE_DIR not set' }, async (t) => {
+    const { dir, result } = await generateReal(t, { templateType: 'blank', flags: GAME_SCHEMA.flags, theme: { family: 'pastel' } });
     assert.equal(result.theme.family, 'pastel');
-    assert.equal(await fs.pathExists(path.join(dir, THEME_FILES[1])), false);
     assert.deepEqual(await verifyGameProject(dir), []);
 });
 
