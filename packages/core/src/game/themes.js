@@ -26,10 +26,10 @@ function checkPalette(id, name, palette) {
     }
 }
 
+// A family's dark palette (older template snapshots still carry it) is ignored: nothing uses it any more
 function checkFamily(f) {
     if (!isObject(f) || !isText(f.id)) throw broken('a family has no id');
     checkPalette(f.id, 'light', f.light);
-    checkPalette(f.id, 'dark', f.dark);
     if (!isObject(f.style)) throw broken(`family "${f.id}" has no style`);
     if (!Array.isArray(f.fontPairs) || !f.fontPairs.length) throw broken(`family "${f.id}" has no font pairs`);
     for (const p of f.fontPairs) {
@@ -37,7 +37,7 @@ function checkFamily(f) {
     }
     return {
         id: f.id, title: f.title, suits: f.suits,
-        light: { ...f.light }, dark: { ...f.dark }, style: { ...f.style },
+        light: { ...f.light }, style: { ...f.style },
         fontPairs: f.fontPairs.map((p) => ({ id: p.id, display: p.display, body: p.body }))
     };
 }

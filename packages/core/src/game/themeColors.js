@@ -10,11 +10,9 @@ const NON_TEXT = 3;
 const SMALL_TEXT = 3;
 const BOX_ON_PANEL = 1.25;
 const SELECTED_ON_ROW = 1.1;
-// The floors that differ by palette: Primary text on the rows, Control on Surface
-const MODE_FLOORS = {
-    light: { accentOnRow: 3, controlOnSurface: 1.4 },
-    dark: { accentOnRow: 2.3, controlOnSurface: 3 }
-};
+// Primary text on the rows, Control on Surface
+const ACCENT_ON_ROW = 3;
+const CONTROL_ON_SURFACE = 1.4;
 // A requested hue stays visible: never shifted to black or white
 const MIN_LIGHTNESS = 0.1;
 const MAX_LIGHTNESS = 0.9;
@@ -77,41 +75,37 @@ function hslToHex({ h, s, l }) {
 }
 
 // Every floor a palette must meet: [a, b, floor] contrast pairs, then the colours that must differ
-function contrastPairs(mode) {
-    const { accentOnRow, controlOnSurface } = MODE_FLOORS[mode];
-    return [
-        ['Text', 'Background', BODY_TEXT],
-        ['Text', 'Surface', BODY_TEXT],
-        ['TextMuted', 'Surface', BODY_TEXT],
-        ['OnPrimary', 'Primary', BODY_TEXT],
-        ['OnAccent', 'Accent', BODY_TEXT],
-        ['Danger', 'Surface', NON_TEXT],
-        ['Success', 'Surface', NON_TEXT],
-        ['Primary', 'Surface', NON_TEXT],
-        ['Primary', 'Control', NON_TEXT],
-        ['Control', 'Surface', controlOnSurface],
-        ['Track', 'Surface', BOX_ON_PANEL],
-        ['SurfaceVariant', 'Surface', BOX_ON_PANEL],
-        ['SurfaceVariant', 'Background', BOX_ON_PANEL],
-        ['SurfaceVariant', 'Track', SELECTED_ON_ROW],
-        ['TextMuted', 'Track', SMALL_TEXT],
-        ['TextMuted', 'SurfaceVariant', SMALL_TEXT],
-        ['Primary', 'Track', accentOnRow],
-        ['Primary', 'SurfaceVariant', accentOnRow],
-        ['Primary', 'Track', NON_TEXT]
-    ];
-}
+const CONTRAST_PAIRS = [
+    ['Text', 'Background', BODY_TEXT],
+    ['Text', 'Surface', BODY_TEXT],
+    ['TextMuted', 'Surface', BODY_TEXT],
+    ['OnPrimary', 'Primary', BODY_TEXT],
+    ['OnAccent', 'Accent', BODY_TEXT],
+    ['Danger', 'Surface', NON_TEXT],
+    ['Success', 'Surface', NON_TEXT],
+    ['Primary', 'Surface', NON_TEXT],
+    ['Primary', 'Control', NON_TEXT],
+    ['Control', 'Surface', CONTROL_ON_SURFACE],
+    ['Track', 'Surface', BOX_ON_PANEL],
+    ['SurfaceVariant', 'Surface', BOX_ON_PANEL],
+    ['SurfaceVariant', 'Background', BOX_ON_PANEL],
+    ['SurfaceVariant', 'Track', SELECTED_ON_ROW],
+    ['TextMuted', 'Track', SMALL_TEXT],
+    ['TextMuted', 'SurfaceVariant', SMALL_TEXT],
+    ['Primary', 'Track', ACCENT_ON_ROW],
+    ['Primary', 'SurfaceVariant', ACCENT_ON_ROW],
+    ['Primary', 'Track', NON_TEXT]
+];
 const DISTINCT = [['Accent', 'Primary'], ['Success', 'Danger']];
 
 const sameColour = (a, b) => a.toUpperCase() === b.toUpperCase();
 
-/** The floors roles (role → #RRGGBB) misses in mode ('light' | 'dark'), as 'A on B' / 'A is B'; only the pairs
- * that involve one of `only` when given */
-function paletteProblems(roles, mode, only = null) {
-    if (!MODE_FLOORS[mode]) throw new Error(`unknown palette mode '${mode}'`);
+/** The floors roles (role → #RRGGBB) misses, as 'A on B' / 'A is B'; only the pairs that involve one of `only`
+ * when given */
+function paletteProblems(roles, only = null) {
     const concerns = (a, b) => !only || only.includes(a) || only.includes(b);
     const problems = [];
-    for (const [a, b, floor] of contrastPairs(mode)) {
+    for (const [a, b, floor] of CONTRAST_PAIRS) {
         if (concerns(a, b) && contrast(roles[a], roles[b]) < floor) problems.push(`${a} on ${b}`);
     }
     for (const [a, b] of DISTINCT) if (concerns(a, b) && sameColour(roles[a], roles[b])) problems.push(`${a} is ${b}`);
@@ -133,7 +127,7 @@ const unique = (list) => list.filter((c, i) => list.findIndex((x) => sameColour(
 
 // The requested colour itself when it passes, else its hue at the nearest lightness that does; the text on it is the
 // family's On colour, its Text or its Surface (whichever reads); Control moves only when nothing else works
-function shiftRole(roles, mode, role, requested) {
+function shiftRole(roles, role, requested) {
     const on = `On${role}`;
     const changes = role === 'Primary' ? [role, on, 'Control'] : [role, on];
     const ons = unique([roles[on], roles.Text, roles.Surface]);
@@ -148,26 +142,25 @@ function shiftRole(roles, mode, role, requested) {
         for (const colour of candidates) {
             for (const text of ons) {
                 const next = { ...roles, [role]: colour, [on]: text, ...(role === 'Primary' ? { Control: control } : {}) };
-                if (!paletteProblems(next, mode, changes).length) return next;
+                if (!paletteProblems(next, changes).length) return next;
             }
         }
     }
     return null;
 }
 
-/** family's palette for mode ('light' | 'dark') with the requested primary/accent (#RRGGBB) shifted to pass every
- * contrast floor. roles: role → #RRGGBB(AA); warnings: one line per colour that fell back to the family's */
-function derivePalette(family, { primary, accent } = {}, mode = 'light') {
-    if (!family || !family[mode]) throw new Error(`family has no ${mode} palette`);
-    let roles = { ...family[mode] };
+/** family's palette with the requested primary/accent (#RRGGBB) shifted to pass every contrast floor. roles: role → #RRGGBB(AA); warnings: one line per colour that fell back to the family's */
+function derivePalette(family, { primary, accent } = {}) {
+    if (!family || !family.light) throw new Error('family has no palette');
+    let roles = { ...family.light };
     const warnings = [];
     for (const [role, requested] of [['Primary', primary], ['Accent', accent]]) {
         if (!requested) continue;
-        const next = shiftRole(roles, mode, role, requested);
+        const next = shiftRole(roles, role, requested);
         if (next) roles = next;
-        else warnings.push(`theme: ${role} fell back to the family default in the ${mode} palette`);
+        else warnings.push(`theme: ${role} fell back to the family default in the light palette`);
     }
     return { roles, warnings };
 }
 
-module.exports = { MODE_FLOORS, hexToRgb, rgbToHex, luminance, contrast, hexToHsl, hslToHex, paletteProblems, derivePalette };
+module.exports = { hexToRgb, rgbToHex, luminance, contrast, hexToHsl, hslToHex, paletteProblems, derivePalette };

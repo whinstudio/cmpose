@@ -14,8 +14,11 @@ test('defaults for showcase', () => {
     const v = ok(base);
     assert.deepStrictEqual([v.templateType, v.render, v.minSdk, v.iosVersion, v.companyName], ['showcase', '2d', 25, '15.0', 'Acme']);
     assert.ok(!('ci' in v));
-    assert.deepStrictEqual(v.flags, ['saveSystem', 'uiTheme', 'multiLang', 'network', 'networkInspector', 'purchases', 'ads', 'leaderboards', 'insights']);
+    assert.deepStrictEqual(v.flags, ['saveSystem', 'multiLang', 'network', 'networkInspector', 'purchases', 'ads', 'leaderboards', 'insights']);
     assert.deepStrictEqual([v.features, v.ids], [[], {}]);
+});
+test('an old uiTheme flag is rejected like any unknown flag', () => {
+    assert.match(validateGame({ ...base, templateType: 'blank', flags: ['uiTheme'] }).error, /^flags must be an array of: /);
 });
 test('blank flags: requires are added, order follows the schema', () => {
     assert.deepStrictEqual(ok({ ...base, templateType: 'blank', flags: ['networkInspector', 'ads'] }).flags, ['network', 'networkInspector', 'ads']);

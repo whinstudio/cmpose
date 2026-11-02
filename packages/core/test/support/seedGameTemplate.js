@@ -22,7 +22,6 @@ const GUIDS = {
 // full: every public flag the contract knows, each with one Core folder holding one script
 const EXTRA_FLAGS = {
     saveSystem: { define: 'CMPOSE_SAVESYSTEM', dir: 'Save', guid: G('f3'), cs: G('f4') },
-    uiTheme: { define: 'CMPOSE_UITHEME', dir: 'Theme', guid: G('f5'), cs: G('f6') },
     multiLang: { define: 'CMPOSE_MULTILANG', dir: 'Language', guid: G('f7'), cs: G('f8') },
     network: { define: 'CMPOSE_NETWORK', dir: 'Network', guid: G('f9'), cs: G('fa') },
     networkInspector: { define: 'CMPOSE_NETWORKINSPECTOR', dir: 'NetworkInspector', guid: G('fb'), cs: G('fc'), requires: ['network'] },
@@ -247,17 +246,16 @@ function fullFlags(flags) {
 
 // themes: true copies the real template's .cmpose/themes.json (the six style families); older pins have none.
 // With it come the real template's committed theme assets (family clean), its font and post profile assets (stubs
-// with their real guids) and the scripts the assets name; the dark palette only with full (the uiTheme flag's folder).
+// with their real guids) and the scripts the assets name.
 const THEMES_JSON = path.join(__dirname, '..', 'fixtures', 'game', 'themes.json');
 const THEME_FIXTURES = path.join(__dirname, '..', 'fixtures', 'game', 'theme');
 const THEME_ASSETS = {
     light: 'Assets/_Project/Core/Presentation/Resources/Theme/Light.asset',
-    style: 'Assets/_Project/Core/Presentation/Resources/Theme/Style.asset',
-    dark: 'Assets/_Project/Core/Theme/Resources/Theme/Dark.asset'
+    style: 'Assets/_Project/Core/Presentation/Resources/Theme/Style.asset'
 };
 const pathGuid = (rel) => crypto.createHash('md5').update(`seed:${rel}`).digest('hex');
 
-async function seedThemes(dir, { full }) {
+async function seedThemes(dir) {
     const write = (rel, content) => fs.outputFile(path.join(dir, rel), content);
     const folders = new Set();
     const assetFile = async (rel, guid, content) => {
@@ -274,7 +272,6 @@ async function seedThemes(dir, { full }) {
         await assetFile(rel, guid, stub);
     }
     for (const [name, rel] of Object.entries(THEME_ASSETS)) {
-        if (name === 'dark' && !full) continue;
         await assetFile(rel, pathGuid(rel), await fs.readFile(path.join(THEME_FIXTURES, path.posix.basename(rel)), 'utf8'));
     }
     for (const folder of folders) {
@@ -377,7 +374,7 @@ async function seedGameTemplate(dir, { full = false, legacyCi = false, themes = 
         await f('.cmpose/layers/render-2d/Assets/_Project/Scenes/Menu.unity.meta', meta(GUIDS.menu));
     }
     // After every other folder: the theme assets' folders get a .meta only where none was written
-    if (themes) await seedThemes(dir, { full });
+    if (themes) await seedThemes(dir);
     return dir;
 }
 

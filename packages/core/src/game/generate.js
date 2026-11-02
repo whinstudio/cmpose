@@ -76,7 +76,7 @@ async function generateGame(value, { projectDir, template = null, coreVersion, g
     // 7. the style family (the template's default when none was asked; nothing for a template without families)
     let applied = { warnings: [], theme: null };
     if (theme.value) {
-        applied = await applyTheme(projectDir, theme.value, themes, { uiTheme: value.flags.includes('uiTheme') });
+        applied = await applyTheme(projectDir, theme.value, themes);
         log.info(`✅ Applied theme ${applied.theme.family} (${applied.theme.fontPair})`);
     }
 
