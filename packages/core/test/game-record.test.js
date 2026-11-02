@@ -22,6 +22,8 @@ test('buildGameRecord records the options and id statuses, never the id values',
         generator: '@cmpose/core',
         coreVersion: '0.2.0',
         generatorVersion: null,
+        companyName: 'Acme',
+        projectName: 'SkyHopper',
         engine: 'unity',
         unityVersion: GAME_SCHEMA.unityVersion,
         templateType: 'blank',
@@ -36,7 +38,15 @@ test('buildGameRecord records the options and id statuses, never the id values',
         generatedAt: '2026-10-14T08:30:00.000Z'
     });
     assert.ok(!JSON.stringify(record).includes(ADMOB_APP));
-    assert.ok(!JSON.stringify(record).includes('Acme'));
+});
+
+test('buildGameRecord records companyName and projectName right after generatorVersion', () => {
+    const record = buildGameRecord({ template: TEMPLATE, coreVersion: '0.2.0', value: VALUE, now: NOW });
+    assert.equal(record.companyName, 'Acme');
+    assert.equal(record.projectName, 'SkyHopper');
+    const keys = Object.keys(record);
+    const i = keys.indexOf('generatorVersion');
+    assert.deepEqual(keys.slice(i + 1, i + 3), ['companyName', 'projectName']);
 });
 
 test('buildGameRecord records the theme as applied', () => {
