@@ -28,6 +28,8 @@ function buildGameRecord({ template, coreVersion, generatorVersion = null, value
         generator: '@cmpose/core',
         coreVersion,
         generatorVersion: generatorVersion || null,
+        companyName: value.companyName,
+        projectName: value.projectName,
         engine: 'unity',
         unityVersion: GAME_SCHEMA.unityVersion,
         templateType: value.templateType,
