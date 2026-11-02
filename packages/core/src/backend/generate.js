@@ -13,6 +13,10 @@ const { verifyBackendProject } = require('./verifier');
 // Added with the sample option: a template without it is older than this generator (an error, never tolerated)
 const SAMPLE_PATHS_FILE = path.join('tools', 'sample-paths.txt');
 
+// The public snapshot hides .github/dependabot.yml as .github/dependabot.yml.template; the project gets it back under its real name
+const DEPENDABOT_FILE = path.join('.github', 'dependabot.yml');
+const DEPENDABOT_SNAPSHOT_FILE = path.join('.github', 'dependabot.yml.template');
+
 const LEFTOVERS = ['.git', COMMIT_FILE_NAME, REF_FILE_NAME, 'LICENSE', path.join('tools', 'gate.sh'), path.join('tools', 'TEMPLATE.md')];
 
 // Turns a fresh backend template copy (projectDir) into the requested project, in place. value: validateBackend().value.
@@ -40,7 +44,10 @@ async function generateBackend(value, { projectDir, templateRef = null, template
     await applyBackendIdentity(projectDir, value);
     log.info(`✅ Renamed to ${value.appName} (${value.packageName})`);
 
-    // 3. leftovers, then the record
+    // 3. the snapshot's hidden dependabot file, leftovers, then the record
+    if (await fs.pathExists(path.join(projectDir, DEPENDABOT_SNAPSHOT_FILE))) {
+        await fs.move(path.join(projectDir, DEPENDABOT_SNAPSHOT_FILE), path.join(projectDir, DEPENDABOT_FILE), { overwrite: true });
+    }
     for (const leftover of LEFTOVERS) await fs.remove(path.join(projectDir, leftover));
     const record = await writeBackendRecord(projectDir, value, { templateRef: ref, templateCommit: commit, generatorVersion, now });
 
