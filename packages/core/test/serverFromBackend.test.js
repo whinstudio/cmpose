@@ -86,6 +86,17 @@ test('placeServerRemovesGithubAndRecord', async (t) => {
     assert.equal(await exists(server, 'tools/gate.sh'), false);
 });
 
+test('server/ keeps no dependabot file under either name', async (t) => {
+    const raw = await fixtureCopy(t);
+    await fs.outputFile(path.join(raw, '.github', 'dependabot.yml.template'), 'version: 2\n');
+    const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-place-'));
+    t.after(() => fs.remove(projectDir));
+    await placeServer(projectDir, { packageName: 'com.example.demo', projectName: 'Demo', backendTemplate: { dir: raw, ...TEMPLATE } });
+    const server = path.join(projectDir, 'server');
+    assert.equal(await exists(server, '.github/dependabot.yml'), false);
+    assert.equal(await exists(server, '.github/dependabot.yml.template'), false);
+});
+
 test('placeServer names the backend template ref that predates the sample option', async (t) => {
     const raw = await fixtureCopy(t);
     await fs.remove(path.join(raw, 'tools', 'sample-paths.txt'));

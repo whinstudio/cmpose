@@ -109,6 +109,31 @@ test('a template older than the sample option fails with its ref, before anythin
     assert.ok(await exists(projectDir, `src/main/kotlin/${TEMPLATE_PKG_DIR}/feature/sample`));
 });
 
+test('a snapshot\'s hidden dependabot file is restored', async (t) => {
+    const projectDir = await fixtureCopy(t);
+    await fs.outputFile(path.join(projectDir, '.github', 'dependabot.yml.template'), 'version: 2 # hidden\n');
+    await generateBackend(valueOf({}), { projectDir });
+    assert.equal(await read(projectDir, '.github/dependabot.yml'), 'version: 2 # hidden\n');
+    assert.equal(await exists(projectDir, '.github/dependabot.yml.template'), false);
+});
+
+test('a template with dependabot.yml generates as before', async (t) => {
+    const projectDir = await fixtureCopy(t);
+    await fs.outputFile(path.join(projectDir, '.github', 'dependabot.yml'), 'version: 2 # plain\n');
+    await generateBackend(valueOf({}), { projectDir });
+    assert.equal(await read(projectDir, '.github/dependabot.yml'), 'version: 2 # plain\n');
+    assert.equal(await exists(projectDir, '.github/dependabot.yml.template'), false);
+});
+
+test('with both names the hidden one wins', async (t) => {
+    const projectDir = await fixtureCopy(t);
+    await fs.outputFile(path.join(projectDir, '.github', 'dependabot.yml'), 'version: 2 # plain\n');
+    await fs.outputFile(path.join(projectDir, '.github', 'dependabot.yml.template'), 'version: 2 # hidden\n');
+    await generateBackend(valueOf({}), { projectDir });
+    assert.equal(await read(projectDir, '.github/dependabot.yml'), 'version: 2 # hidden\n');
+    assert.equal(await exists(projectDir, '.github/dependabot.yml.template'), false);
+});
+
 test('the record holds only known options', () => {
     const record = buildBackendRecord({ ...valueOf({ sharing: true }), secret: 'x' }, {});
     assert.equal(record.sharing, true);
