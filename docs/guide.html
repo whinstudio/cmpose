@@ -3162,8 +3162,8 @@ class FavoritesRepositoryImpl(@Provided private val favoriteUserDao: FavoriteUse
                         <code>config.properties</code> (where <code>firebaseProjectId</code> names your Firebase
                         project) live in <code>.local-server/</code>, which is git-ignored. Debug builds of the app
                         talk to this local server at <code>localhost:18001</code>. For an Android debug build (emulator
-                        or phone), run <code>adb reverse tcp:18001 tcp:18001</code> once per emulator boot or USB
-                        connection; the iOS simulator needs nothing.
+                        or phone), run <code>adb reverse tcp:18001 tcp:18001</code> again after each emulator start, USB
+                        reconnection or adb restart; the iOS simulator needs nothing.
                     </p>
 
                     <h2 id="backend-firebase">Add your Firebase config files</h2>
