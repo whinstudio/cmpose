@@ -33,11 +33,11 @@ const BACKEND_PATHS = [
     `shared/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/SessionGate.kt`,
     `shared/src/androidHostTest/kotlin/${TEMPLATE_PACKAGE_PATH}/MainScreenGateTest.kt`,
     `shared/src/androidHostTest/kotlin/${TEMPLATE_PACKAGE_PATH}/di/BackendBindingsTest.kt`,
-    ...['BackendClient', 'BackendConfig', 'EmulatorDetection', 'LocalHost', 'TokenSource']
+    ...['BackendClient', 'BackendConfig', 'LocalHost', 'TokenSource']
         .map((name) => `core/network/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/${name}.kt`),
     `core/network/src/androidMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/LocalHost.android.kt`,
     `core/network/src/iosMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/LocalHost.ios.kt`,
-    ...['AuthenticatedClientTest', 'BackendConfigTest', 'EmulatorDetectionTest']
+    ...['AuthenticatedClientTest', 'BackendConfigTest']
         .map((name) => `core/network/src/commonTest/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/${name}.kt`),
     `core/image/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalization.kt`,
     `core/image/src/androidMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalization.android.kt`,

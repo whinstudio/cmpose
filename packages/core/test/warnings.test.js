@@ -20,6 +20,7 @@ test('blank with backend warns once about the Firebase config files and the loca
     assert.match(w[0], /google-services\.json/);
     assert.match(w[0], /GoogleService-Info\.plist/);
     assert.match(w[0], /:server:runLocal/);
+    assert.match(w[0], /adb reverse tcp:18001 tcp:18001/);
 });
 
 test('showcase never warns about the backend', () => {
