@@ -31,22 +31,26 @@ const BACKEND_PATHS = [
     'iosApp/iosApp/iosApp.entitlements',
     `shared/src/iosMain/kotlin/${TEMPLATE_PACKAGE_PATH}/SignInRegistration.kt`,
     `shared/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/SessionGate.kt`,
+    ...['shared', 'blank/layers/multilang/shared']
+        .map((module) => `${module}/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/LocalServerHint.kt`),
+    `shared/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/LocalServerBanner.kt`,
+    `shared/src/androidHostTest/kotlin/${TEMPLATE_PACKAGE_PATH}/LocalServerBannerTest.kt`,
     `shared/src/androidHostTest/kotlin/${TEMPLATE_PACKAGE_PATH}/MainScreenGateTest.kt`,
     `shared/src/androidHostTest/kotlin/${TEMPLATE_PACKAGE_PATH}/di/BackendBindingsTest.kt`,
-    ...['BackendClient', 'BackendConfig', 'LocalHost', 'TokenSource']
+    ...['BackendClient', 'BackendConfig', 'LocalHost', 'LocalServerStatus', 'TokenSource']
         .map((name) => `core/network/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/${name}.kt`),
     `core/network/src/androidMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/LocalHost.android.kt`,
     `core/network/src/iosMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/LocalHost.ios.kt`,
-    ...['AuthenticatedClientTest', 'BackendConfigTest']
+    ...['AuthenticatedClientTest', 'BackendConfigTest', 'LocalServerStatusTest']
         .map((name) => `core/network/src/commonTest/kotlin/${TEMPLATE_PACKAGE_PATH}/core/network/${name}.kt`),
     `core/image/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalization.kt`,
     `core/image/src/androidMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalization.android.kt`,
     `core/image/src/iosMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalization.ios.kt`,
     `core/image/src/commonTest/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalizationTest.kt`,
     `core/image/src/androidDeviceTest/kotlin/${TEMPLATE_PACKAGE_PATH}/core/image/ImageNormalizationDeviceTest.kt`,
-    ...['core/multilang', 'blank/layers/multilang/core/multilang'].flatMap((module) => ['AccountStrings', 'SharingStrings']
+    ...['core/multilang', 'blank/layers/multilang/core/multilang'].flatMap((module) => ['AccountStrings', 'LocalServerStrings', 'SharingStrings']
         .map((name) => `${module}/src/commonMain/kotlin/${TEMPLATE_PACKAGE_PATH}/core/multilang/resource/${name}.kt`)),
-    ...['SharedSpacesWarningTest', 'SharingStringsTest']
+    ...['LocalServerStringsTest', 'SharedSpacesWarningTest', 'SharingStringsTest']
         .map((name) => `core/multilang/src/commonTest/kotlin/${TEMPLATE_PACKAGE_PATH}/core/multilang/resource/${name}.kt`)
 ];
 
