@@ -1,8 +1,8 @@
 'use strict';
 const path = require('path');
-const crypto = require('crypto');
 const fs = require('fs-extra');
 const core = require('@cmpose/core');
+const { newWorkDir } = require('./workDirs');
 const { removeEmptyDir, targetProblem } = require('./generate');
 
 const fail = (text) => ({ isError: true, content: [{ type: 'text', text }] });
@@ -39,7 +39,7 @@ async function runGameGenerate(args, { cacheDir, remoteUrl, onProgress = () => {
     }
 
     await fs.ensureDir(outputDir);
-    const work = path.join(outputDir, `.cmpose-${crypto.randomBytes(6).toString('hex')}`);
+    const work = await newWorkDir(outputDir);
     try {
         onProgress('Generating the project');
         await fs.copy(cache.dir, work);

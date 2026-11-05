@@ -1,8 +1,8 @@
 'use strict';
 const path = require('path');
-const crypto = require('crypto');
 const fs = require('fs-extra');
 const core = require('@cmpose/core');
+const { newWorkDir } = require('./workDirs');
 const { DEFAULTS } = require('./describe');
 const { resolveBackendTemplate, copyBackendTemplate } = require('./backendTemplate');
 
@@ -109,7 +109,7 @@ async function runGenerate(args, {
     if (sdkError) return fail(sdkError);
 
     await fs.ensureDir(outputDir);
-    const work = path.join(outputDir, `.cmpose-${crypto.randomBytes(6).toString('hex')}`);
+    const work = await newWorkDir(outputDir);
     // The backend template's raw copy, beside the work dir; core places it as server/
     const serverRaw = `${work}-server`;
     try {
