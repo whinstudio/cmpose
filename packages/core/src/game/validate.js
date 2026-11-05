@@ -10,6 +10,10 @@ const KOTLIN_KEYWORDS = PV.KOTLIN_HARD_KEYWORDS;
 const NAME_RE = /^[A-Za-z][A-Za-z0-9]{0,29}$/;
 const PACKAGE_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*){2,}$/;
 const MODULE_RE = /^[a-z][a-z0-9]{0,19}$/;
+// The template's identity (verifier.js IDENTITY_RULE): a name holding it in any case would fail the verifier late
+const IDENTITY_TOKENS = ['UnityBase', 'com.kturker'];
+// appName goes into ProjectSettings.asset as a plain YAML scalar: a leading indicator would change its meaning
+const YAML_INDICATOR_RE = /^[-'"#&*!|>%@`?:,[\]{}]/;
 // 'M', 'M.m' or 'M.m.0' (leading zeros allowed); normalized to 'M.m'
 const IOS_VERSION_RE = /^(\d+)(?:\.(\d+)(?:\.(0+))?)?$/;
 
@@ -48,11 +52,17 @@ const fail = (error) => ({ ok: false, error });
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const inList = (list, word, ci) => list.includes(ci ? String(word).toLowerCase() : word);
 
+function identityProblem(field, value) {
+    const lower = value.toLowerCase();
+    const token = IDENTITY_TOKENS.find((t) => lower.includes(t.toLowerCase()));
+    return token ? `${field} must not contain "${token}" in any case (reserved for the template's identity)` : null;
+}
+
 function checkName(field, value) {
     if (typeof value !== 'string' || !NAME_RE.test(value)) return `${field} must be 1-${S.limits.nameMax} letters or digits, starting with a letter`;
     if (inList(CSHARP_KEYWORDS, value, false)) return `${field} must not be a C# keyword`;
     if (S.reservedNames.includes(value)) return `${field} is reserved`;
-    return null;
+    return identityProblem(field, value);
 }
 
 function parseIosVersion(v) {
@@ -96,12 +106,16 @@ function validateIds(ids, flags) {
 
 function validateGame(input) {
     if (!isObject(input)) return fail('input must be an object');
-    const { projectName, appName, packageName } = input;
+    const { projectName, packageName } = input;
+    const appName = typeof input.appName === 'string' ? input.appName.trim() : input.appName;
 
     let err = checkName('projectName', projectName);
     if (err) return fail(err);
 
+    if (typeof appName === 'string' && YAML_INDICATOR_RE.test(appName)) return fail(`appName must not start with "${appName[0]}" (it would break the YAML in ProjectSettings.asset)`);
     if (typeof appName !== 'string' || !PV.validateAppName(appName) || appName.length > S.limits.appNameMax) return fail(PV.messages.appNameInvalid.replace('App Name', 'appName'));
+    err = identityProblem('appName', appName);
+    if (err) return fail(err);
 
     if (typeof packageName !== 'string' || !PACKAGE_RE.test(packageName) || packageName.length > S.limits.packageNameMax) {
         return fail(`packageName must look like com.company.app (lowercase, at least 3 segments, up to ${S.limits.packageNameMax} characters)`);
@@ -109,6 +123,8 @@ function validateGame(input) {
     const segments = packageName.split('.');
     if (segments.some((s) => inList(CSHARP_KEYWORDS, s, true) || inList(KOTLIN_KEYWORDS, s, true))) return fail('packageName must not contain a keyword segment');
     if (packageName === S.reservedPackagePrefix || packageName.startsWith(S.reservedPackagePrefix + '.')) return fail('packageName must not use the reserved com.kturker prefix');
+    err = identityProblem('packageName', packageName);
+    if (err) return fail(err);
 
     // Without companyName it comes from packageName's second segment: an error then points at packageName
     const derived = input.companyName === undefined;
@@ -143,6 +159,8 @@ function validateGame(input) {
             if (typeof f !== 'string' || !MODULE_RE.test(f)) return fail(`features entry "${f}" must be 1-${S.limits.moduleNameMax} lowercase letters or digits, starting with a letter`);
             if (inList(CSHARP_KEYWORDS, f, true) || inList(KOTLIN_KEYWORDS, f, true)) return fail(`features entry "${f}" is a keyword`);
             if (S.reservedModuleNames.includes(f)) return fail(`features entry "${f}" is reserved`);
+            const problem = identityProblem(`features entry "${f}"`, f);
+            if (problem) return fail(problem);
         }
         if (new Set(list).size !== list.length) return fail('features must not contain duplicates');
         features = list.slice();

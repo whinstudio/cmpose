@@ -152,3 +152,43 @@ test('theme: optional, an object of known fields, colours as #RRGGBB (uppercased
     bad({ ...base, theme: { fontPair: 7 } }, 'theme\\.fontPair');
     bad({ ...base, theme: { mood: 'happy' } }, 'theme has unknown fields: mood');
 });
+test('game appName is trimmed', () => {
+    assert.strictEqual(ok({ ...base, appName: ' Sky ' }).appName, 'Sky');
+    assert.strictEqual(ok({ ...base, appName: '\tSky Hopper\n' }).appName, 'Sky Hopper');
+    bad({ ...base, appName: '   ' }, 'appName');
+});
+test('game names containing the template identity are refused', () => {
+    const b = { ...base, templateType: 'blank' };
+    const refused = (input, field, token) => {
+        const r = validateGame(input);
+        assert.strictEqual(r.ok, false, JSON.stringify(input));
+        assert.ok(r.error.startsWith(field), r.error);
+        assert.ok(r.error.includes(`"${token}"`), r.error);
+    };
+    for (const id of ['UnityBase', 'unitybase', 'UNITYBASE']) {
+        refused({ ...base, projectName: `My${id}Game` }, 'projectName', 'UnityBase');
+        refused({ ...base, companyName: `My${id}` }, 'companyName', 'UnityBase');
+        refused({ ...base, appName: `My ${id} Game` }, 'appName', 'UnityBase');
+        refused({ ...b, features: [`my${id.toLowerCase()}`] }, `features entry "my${id.toLowerCase()}"`, 'UnityBase');
+    }
+    refused({ ...base, packageName: 'com.acme.unitybase' }, 'packageName', 'UnityBase');
+    refused({ ...base, packageName: 'org.com.kturker.x' }, 'packageName', 'com.kturker');
+    refused({ ...base, packageName: 'com.kturkerx.game' }, 'packageName', 'com.kturker');
+    refused({ ...base, appName: 'Com.KTurker.x' }, 'appName', 'com.kturker');
+    bad({ ...base, packageName: 'com.kturker.x' }, 'packageName');
+    bad({ ...base, packageName: 'com.KTurker.x' }, 'packageName');
+});
+test('game appName starting with a YAML indicator is refused', () => {
+    for (const c of ['-', "'", '"', '#', '&', '*', '!', '|', '>', '%', '@', '`', '?', ':', ',', '[', ']', '{', '}']) {
+        for (const appName of [`${c}Sky`, ` ${c}Sky `]) {
+            const r = validateGame({ ...base, appName });
+            assert.strictEqual(r.ok, false, appName);
+            assert.ok(r.error.startsWith(`appName must not start with "${c}"`), r.error);
+        }
+    }
+    bad({ ...base, appName: '#1 Game' }, 'appName');
+    bad({ ...base, appName: '&Co' }, 'appName');
+});
+test('game appName with a quote or dash inside is accepted', () => {
+    for (const appName of ["Sky's Edge", 'Sky-Run', ' Sky-Run ']) assert.strictEqual(ok({ ...base, appName }).appName, appName.trim());
+});
