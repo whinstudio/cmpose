@@ -94,6 +94,7 @@ function contractFacts({ limits = LIMITS, serverLimits = null } = {}) {
         },
         regex: Object.fromEntries(Object.entries(PV.patterns).map(([k, re]) => [k, re.source])),
         kotlinHardKeywords: [...PV.KOTLIN_HARD_KEYWORDS],
+        javaKeywords: [...PV.JAVA_KEYWORDS],
         reservedModuleNames: [...PV.RESERVED_MODULE_NAMES],
         reservedPackagePrefix: OLD_PACKAGE_NAME,
         messages: { ...PV.messages },

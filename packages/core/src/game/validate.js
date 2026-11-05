@@ -6,6 +6,8 @@ const { checkThemeShape } = require('./themes');
 
 const CSHARP_KEYWORDS = ('abstract as base bool break byte case catch char checked class const continue decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while').split(' ');
 const KOTLIN_KEYWORDS = PV.KOTLIN_HARD_KEYWORDS;
+// Unity's Android build uses packageName as the Gradle namespace, which AGP refuses with a Java keyword segment
+const JAVA_KEYWORDS = PV.JAVA_KEYWORDS;
 
 const NAME_RE = /^[A-Za-z][A-Za-z0-9]{0,29}$/;
 const PACKAGE_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*){2,}$/;
@@ -121,7 +123,7 @@ function validateGame(input) {
         return fail(`packageName must look like com.company.app (lowercase, at least 3 segments, up to ${S.limits.packageNameMax} characters)`);
     }
     const segments = packageName.split('.');
-    if (segments.some((s) => inList(CSHARP_KEYWORDS, s, true) || inList(KOTLIN_KEYWORDS, s, true))) return fail('packageName must not contain a keyword segment');
+    if (segments.some((s) => inList(CSHARP_KEYWORDS, s, true) || inList(KOTLIN_KEYWORDS, s, true) || inList(JAVA_KEYWORDS, s, true))) return fail('packageName must not contain a keyword segment');
     if (packageName === S.reservedPackagePrefix || packageName.startsWith(S.reservedPackagePrefix + '.')) return fail('packageName must not use the reserved com.kturker prefix');
     err = identityProblem('packageName', packageName);
     if (err) return fail(err);
@@ -157,7 +159,7 @@ function validateGame(input) {
         if (list.length > S.limits.maxModules) return fail(`features allows at most ${S.limits.maxModules} entries`);
         for (const f of list) {
             if (typeof f !== 'string' || !MODULE_RE.test(f)) return fail(`features entry "${f}" must be 1-${S.limits.moduleNameMax} lowercase letters or digits, starting with a letter`);
-            if (inList(CSHARP_KEYWORDS, f, true) || inList(KOTLIN_KEYWORDS, f, true)) return fail(`features entry "${f}" is a keyword`);
+            if (inList(CSHARP_KEYWORDS, f, true) || inList(KOTLIN_KEYWORDS, f, true) || inList(JAVA_KEYWORDS, f, true)) return fail(`features entry "${f}" is a keyword`);
             if (S.reservedModuleNames.includes(f)) return fail(`features entry "${f}" is reserved`);
             const problem = identityProblem(`features entry "${f}"`, f);
             if (problem) return fail(problem);

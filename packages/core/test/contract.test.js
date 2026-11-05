@@ -57,3 +57,13 @@ test('the insights flag changes the contract hash', () => {
     assert.strictEqual(before.featuresConfigKeys.includes('insights'), false);
     assert.notStrictEqual(hashContract(contractFacts()), hashContract(before));
 });
+
+test('contractFacts publishes the Java keywords', () => {
+    const facts = contractFacts();
+    for (const word of ['new', 'int', 'switch', 'native', 'true', 'false', 'null']) {
+        assert.ok(facts.javaKeywords.includes(word), word);
+    }
+    // Kept for clients that read the Kotlin list
+    assert.ok(facts.kotlinHardKeywords.includes('object'));
+    assert.match(facts.messages.packageNameInvalid, /Java or Kotlin keyword/);
+});
