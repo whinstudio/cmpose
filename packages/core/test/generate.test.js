@@ -41,6 +41,16 @@ test('generates a showcase project in place and reports what it did', async () =
     await fs.remove(projectDir);
 });
 
+test('showcase features naming a template module are reported, not generated', async () => {
+    const projectDir = await freshCopy();
+    const { value } = validate({ projectName: 'Demo', appName: 'Demo App', packageName: 'com.example.demo', minSdk: '24', iosVersion: '15.0', features: ['home'] });
+    const summary = await generateCmpProject(value, { projectDir });
+    assert.deepStrictEqual(summary.features, []);
+    assert.ok(summary.warnings.includes("features home were not generated: they are the template's own modules (already in the project)."),
+        summary.warnings.join(' | '));
+    await fs.remove(projectDir);
+});
+
 test('a broken copy fails instead of returning a project', async () => {
     const projectDir = await freshCopy();
     await fs.remove(path.join(projectDir, 'iosApp'));

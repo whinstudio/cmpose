@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const { OLD_PACKAGE_NAME } = require('./templateIdentity');
 const { removeMarkedBlock } = require('./readmeService');
+const { SHOWCASE_FEATURES } = require('./showcaseModules');
 
 // Blank's shell and every requested feature module come from the template itself (the
 // blank/ overlay and the compiled feature/sample module). Both steps run BEFORE the package
@@ -26,7 +27,6 @@ const BLANK_LAYERS = [
     { name: 'room', release: 'room', applies: (cfg) => cfg.room === true }
 ];
 const SAMPLE_MODULE = 'sample';
-const SHOWCASE_FEATURES = ['home', 'onboarding'];
 // include(":feature:sample") and its four layers, with or without the leading colon
 const SAMPLE_INCLUDE_REGEX = /^\s*include\("?:?feature:sample(?::(?:contract|data|domain|presentation))?"\)\s*$/;
 // Blank-only features of the template: the showcase drops them (see removeBlankOnlyParts)

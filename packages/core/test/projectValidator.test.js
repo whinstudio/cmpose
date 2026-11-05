@@ -23,6 +23,16 @@ test('validatePackageName rejects Kotlin hard keywords as segments', () => {
     }
 });
 
+test('a Java keyword package segment is refused', () => {
+    for (const pkg of ['com.acme.new', 'com.acme.int', 'com.native.app', 'com.acme.null']) {
+        assert.equal(ProjectValidator.validatePackageName(pkg), false, pkg);
+    }
+    assert.match(ProjectValidator.messages.packageNameInvalid, /Java or Kotlin keyword/);
+    // Words that only start with a Java keyword stay allowed
+    assert.equal(ProjectValidator.validatePackageName('com.acme.news'), true);
+    assert.equal(ProjectValidator.validatePackageName('com.acme.integer'), true);
+});
+
 test('validatePackageName keeps words that are not hard keywords (soft keywords, keyword prefixes)', () => {
     for (const pkg of ['com.example.data', 'dev.value.open', 'com.inner.app', 'com.example.objects']) {
         assert.equal(ProjectValidator.validatePackageName(pkg), true, pkg);
@@ -74,6 +84,15 @@ test('validateModuleName rejects Kotlin hard keywords', () => {
     assert.equal(ProjectValidator.validateModuleName('package'), false);
     assert.equal(ProjectValidator.validateModuleName('profile'), true);
     assert.equal(ProjectValidator.validateModuleName('objects'), true);
+});
+
+test('a Java keyword module name is refused', () => {
+    for (const name of ['switch', 'native', 'new', 'int', 'static']) {
+        assert.equal(ProjectValidator.validateModuleName(name), false, name);
+    }
+    assert.match(ProjectValidator.messages.moduleNameInvalid, /Java or Kotlin keyword/);
+    assert.equal(ProjectValidator.validateModuleName('switches'), true);
+    assert.equal(ProjectValidator.validateModuleName('news'), true);
 });
 
 test('validateModuleName rejects the reserved name monetization', () => {

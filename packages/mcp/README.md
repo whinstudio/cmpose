@@ -47,7 +47,7 @@ Navigation, logging (Kermit), image loading (Coil), in-app review, update check,
 screen, a `build-logic` with convention plugins, and a README with a release checklist.
 
 - **Template:** `showcase` (home, onboarding and paywall demo screens) or `blank`
-  (a clean shell with a sample feature).
+  (a start screen that lists your modules and a demo of each option you pick).
 - **Options for `blank`:** Ktor networking (with an optional in-app network inspector),
   theming (light/dark/system), multi-language strings, DataStore, Room (KMP, bundled SQLite),
   RevenueCat purchases with a custom Compose paywall, AdMob ads with UMP/ATT consent, detekt,
@@ -137,7 +137,8 @@ as one Docker container behind nginx. `sharing` adds spaces, roles and invitatio
 
 Generation runs entirely on your machine. The first call downloads the pinned template
 ([whinstudio/cmpose-template](https://github.com/whinstudio/cmpose-template)) into
-`~/.cache/cmpose` (override with `CMPOSE_CACHE_DIR`), and later calls reuse it. Games come the
+`$XDG_CACHE_HOME/cmpose` (else `~/.cache/cmpose`; override with `CMPOSE_CACHE_DIR`), and later
+calls reuse it. Games come the
 same way from the pinned game template
 ([whinstudio/cmpose-game-template](https://github.com/whinstudio/cmpose-game-template)); Unity
 never runs during generation. Backends come from the pinned backend template

@@ -26,7 +26,8 @@ backend template (`whinstudio/cmpose-backend-template`), with an optional `shari
   `game_describe`, `game_generate`, `backend_describe` and `backend_generate`.
 
 Requires Node.js 20+ and git. The first generation downloads the pinned template
-(`whinstudio/cmpose-template`) into `~/.cache/cmpose` (override: `CMPOSE_CACHE_DIR`).
+(`whinstudio/cmpose-template`) into `$XDG_CACHE_HOME/cmpose` when `XDG_CACHE_HOME` is set, else
+`~/.cache/cmpose` (override: `CMPOSE_CACHE_DIR`).
 
 Developer guide (architecture, modules, backend, release): https://whinstudio.github.io/cmpose/guide.html
 
@@ -75,15 +76,17 @@ adds code to the generated backend.
 
 ## Compatibility
 
-From 1.0.0 the MCP tools follow semantic versioning.
+From 1.0.0 the MCP tools follow semantic versioning. The current major is 2.x (2.0.0 removed the
+game `uiTheme` flag). Each `@cmpose/mcp` release depends on the `@cmpose/core` release of the same
+version and pins one tag of each template, so a given version always generates the same project.
 
-- **Stable in 1.x:** the six tool names; every input field above, its accepted values and its
+- **Stable in 2.x:** the six tool names; every input field above, its accepted values and its
   default (the `featuresConfig` keys, the game `flags`, the backend options); the fields of each
   tool's structured result.
-- **A 1.x release may:** add optional fields, flags or values; accept input an earlier release
+- **A 2.x release may:** add optional fields, flags or values; accept input an earlier release
   refused; add warnings; move the pinned templates to newer tags (the release notes say what the
   generated projects gain).
-- **Needs 2.0:** renaming or removing a field, flag or value; refusing input a 1.x release
+- **Needs 3.0:** renaming or removing a field, flag or value; refusing input a 2.x release
   accepted; changing a default.
 - **Not covered:** the contents of the generated projects (they follow the pinned templates),
   the text of warnings and errors, and `templateRef` / `backendTemplateRef` pointing at a tag

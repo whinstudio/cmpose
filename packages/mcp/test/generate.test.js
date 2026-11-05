@@ -335,6 +335,27 @@ test('localBackendTemplateDirIsUsedAndWarned', async (t) => {
     assert.deepStrictEqual(await leftovers(outputDir), []);
 });
 
+test('a local backend dir records local in generation.json even with backendTemplateRef', async (t) => {
+    const { template, backendCalls, seen, run } = await backendSetup(t);
+    const r = await run({ ...BACKEND_ON, backendTemplateRef: 'backend-template-2026.01.01' }, { backendTemplateDir: template });
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    assert.deepStrictEqual(backendCalls(), []);
+    // core writes generation.json's server template from this ref
+    assert.strictEqual(seen[0].opts.backendTemplate.ref, 'local');
+    assert.deepStrictEqual(r.structuredContent.backendTemplate, { repo: core.pins.backend.repo, ref: 'local', commit: null });
+    assert.ok(r.content[0].text.split('\n').includes(`Server template: ${core.pins.backend.repo}@local`), r.content[0].text);
+});
+
+test('the local backend warning says the ref was ignored', async (t) => {
+    const { template, run } = await backendSetup(t);
+    const r = await run({ ...BACKEND_ON, backendTemplateRef: 'backend-template-2026.01.01' }, { backendTemplateDir: template });
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    const warning = r.structuredContent.warnings.find((w) => /CMPOSE_BACKEND_TEMPLATE_DIR/.test(w));
+    assert.strictEqual(warning, 'server/ was generated from a local backend template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), ' +
+        'not a released tag; backendTemplateRef backend-template-2026.01.01 was ignored.');
+    assert.match(r.content[0].text, /Warning: server\/ was generated from a local backend template checkout .*was ignored\./);
+});
+
 test('backendOffDoesNotFetchTheBackendTemplate', async (t) => {
     const { calls, backendCalls, seen, progress, run } = await backendSetup(t);
     const r = await run({ templateType: 'blank', featuresConfig: { backend: false } });

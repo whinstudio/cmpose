@@ -40,8 +40,12 @@
     // Kotlin hard keywords - cannot be used as package segments or module names
     const KOTLIN_HARD_KEYWORDS = ['as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun', 'if', 'in', 'interface', 'is', 'null', 'object', 'package', 'return', 'super', 'this', 'throw', 'true', 'try', 'typealias', 'typeof', 'val', 'var', 'when', 'while'];
 
-    function isKotlinHardKeyword(word) {
-        return KOTLIN_HARD_KEYWORDS.indexOf(word) !== -1;
+    // Java reserved words and literals - AGP refuses a namespace with one as a segment
+    // (e.g. com.acme.new), and module names become package segments too
+    const JAVA_KEYWORDS = ['abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const', 'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float', 'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native', 'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void', 'volatile', 'while', 'true', 'false', 'null'];
+
+    function isKeyword(word) {
+        return KOTLIN_HARD_KEYWORDS.indexOf(word) !== -1 || JAVA_KEYWORDS.indexOf(word) !== -1;
     }
 
     // Module names the generator cannot use: file processing skips every directory named build
@@ -135,6 +139,7 @@
          */
         patterns: PATTERNS,
         KOTLIN_HARD_KEYWORDS: KOTLIN_HARD_KEYWORDS,
+        JAVA_KEYWORDS: JAVA_KEYWORDS,
         RESERVED_MODULE_NAMES: RESERVED_MODULE_NAMES,
 
         /**
@@ -173,15 +178,15 @@
         /**
          * Validates Package Name format
          * Must start with a letter, contain at least 3 segments separated by dots,
-         * and use only lowercase letters and numbers. No segment may be a Kotlin hard
-         * keyword, and the reserved package (see configure) and packages under it are rejected.
+         * and use only lowercase letters and numbers. No segment may be a Java keyword or a
+         * Kotlin hard keyword, and the reserved package (see configure) and packages under it are rejected.
          * Example: com.example.app
          * @param {string} value - The package name to validate
          * @returns {boolean} - True if valid
          */
         validatePackageName: function (value) {
             if (!PATTERNS.packageName.test(value)) return false;
-            if (value.split('.').some(isKotlinHardKeyword)) return false;
+            if (value.split('.').some(isKeyword)) return false;
             if (RESERVED_PACKAGE_PREFIX &&
                 (value === RESERVED_PACKAGE_PREFIX || value.indexOf(RESERVED_PACKAGE_PREFIX + '.') === 0)) {
                 return false;
@@ -278,13 +283,13 @@
 
         /**
          * Validates Module Name - lowercase letters and numbers allowed, must start with letter,
-         * must not be a Kotlin hard keyword (it becomes a package segment) or a reserved name
+         * must not be a Java or Kotlin hard keyword (it becomes a package segment) or a reserved name
          * (RESERVED_MODULE_NAMES)
          * @param {string} value - The module name to validate
          * @returns {boolean} - True if valid
          */
         validateModuleName: function (value) {
-            return PATTERNS.moduleName.test(value) && value.length > 0 && !isKotlinHardKeyword(value) &&
+            return PATTERNS.moduleName.test(value) && value.length > 0 && !isKeyword(value) &&
                 RESERVED_MODULE_NAMES.indexOf(value) === -1;
         },
 
@@ -351,12 +356,12 @@
             projectNameInvalid: 'Project Name must contain only letters (a-z, A-Z)',
             projectNameTooLong: 'Project Name must be at most ' + MAX_LENGTH_PROJECT_NAME + ' characters',
             packageNameSpaces: 'Package Name cannot contain spaces',
-            packageNameInvalid: 'Invalid Package Name. Must start with a letter, contain at least two dots (3 segments), and use only lowercase letters and numbers (e.g., com.example.app). Segments cannot be Kotlin keywords (e.g., in, is, object), and the template\'s reserved package (or any package under it) cannot be used.',
+            packageNameInvalid: 'Invalid Package Name. Must start with a letter, contain at least two dots (3 segments), and use only lowercase letters and numbers (e.g., com.example.app). Segments cannot be Java or Kotlin keywords (e.g., in, is, object, new, int), and the template\'s reserved package (or any package under it) cannot be used.',
             packageNameTooLong: 'Package Name must be at most ' + MAX_LENGTH_PACKAGE_NAME + ' characters',
             appNameInvalid: 'App Name must be 1-' + MAX_LENGTH_APP_NAME + ' characters using only letters, numbers, spaces and . _ \' - (no leading or trailing spaces)',
             urlInvalid: 'Invalid Base URL. Please enter a valid http(s) URL of at most ' + MAX_LENGTH_BASE_URL + ' characters without spaces, quotes, backslashes or $ (e.g., https://api.example.com)',
             maxModulesReached: 'Maximum ' + MAX_MODULES + ' feature modules allowed',
-            moduleNameInvalid: 'Module name must start with a letter, contain only lowercase letters and numbers (a-z, 0-9), and not be a Kotlin keyword (e.g., in, is, object) or one of the reserved names (' + RESERVED_MODULE_NAMES.join(', ') + ')',
+            moduleNameInvalid: 'Module name must start with a letter, contain only lowercase letters and numbers (a-z, 0-9), and not be a Java or Kotlin keyword (e.g., in, is, object, new, int) or one of the reserved names (' + RESERVED_MODULE_NAMES.join(', ') + ')',
             moduleNameTooLong: 'Module name must be at most ' + MAX_LENGTH_MODULE_NAME + ' characters',
             moduleNameDuplicate: 'Each module name can be used only once',
             minSdkInvalid: 'Min SDK must be a number between ' + MIN_SDK_MIN + ' and ' + MIN_SDK_MAX + '',

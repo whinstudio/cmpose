@@ -3161,8 +3161,9 @@ class FavoritesRepositoryImpl(@Provided private val favoriteUserDao: FavoriteUse
                         <code>GET /health</code> answers 200. Its data, uploaded files and its
                         <code>config.properties</code> (where <code>firebaseProjectId</code> names your Firebase
                         project) live in <code>.local-server/</code>, which is git-ignored. Debug builds of the app
-                        talk to this local server at <code>localhost:18001</code>. For an Android debug build (emulator
-                        or phone), run <code>adb reverse tcp:18001 tcp:18001</code> again after each emulator start, USB
+                        talk to this local server at <code>localhost:18001</code>. Android debug builds (the emulator,
+                        or a phone over USB) use <code>localhost</code> too, so they need
+                        <code>adb reverse tcp:18001 tcp:18001</code>, run again after each emulator start, USB
                         reconnection or adb restart; the iOS simulator needs nothing.
                     </p>
 
@@ -3191,11 +3192,13 @@ class FavoritesRepositoryImpl(@Provided private val favoriteUserDao: FavoriteUse
                         committed.
                     </p>
 
-                    <h2 id="backend-devices">Emulator and simulator only, for now</h2>
+                    <h2 id="backend-devices">Which devices reach the server</h2>
                     <p>
-                        The app reaches the local server from the Android emulator and the iOS simulator. A
-                        physical phone and a deployed server are not set up yet: to ship, host the server yourself
-                        and point the release build at it.
+                        Debug builds reach the local server from the Android emulator and an Android phone over USB
+                        (both through <code>adb reverse tcp:18001 tcp:18001</code>, see above) and from the iOS
+                        simulator. A physical iPhone cannot use <code>localhost</code>: it would need the Mac's
+                        address on the local network, which the template does not set. A deployed server is not set
+                        up either: to ship, host the server yourself and point the release build at it.
                     </p>
 
                     <h2 id="backend-privacy">Privacy declarations</h2>

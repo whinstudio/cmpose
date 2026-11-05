@@ -49,7 +49,8 @@ async function resolveBackendTemplate({
         const stat = path.isAbsolute(templateDir) ? await fs.stat(templateDir).catch(() => null) : null;
         if (!stat || !stat.isDirectory()) throw new TypeError('CMPOSE_BACKEND_TEMPLATE_DIR must be the absolute path of a backend template checkout.');
         onProgress(`Preparing the local ${label}`);
-        return { dir: templateDir, repo, ref: templateRef || 'local', commit: null, local: true };
+        // A given ref was not what was copied: the record says local, the caller warns that the ref was ignored
+        return { dir: templateDir, repo, ref: 'local', commit: null, local: true };
     }
     const template = { repo, ref: templateRef || core.pins.backend.ref, cacheDir };
     if (isPending(template.ref)) {

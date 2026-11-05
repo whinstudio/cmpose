@@ -70,3 +70,22 @@ test('a package below the template\'s parent dirs moves cleanly', async (t) => {
     assert.ok(await exists(dir, 'src/main/kotlin/io/cmpose/other/Main.kt'));
     assert.equal(await exists(dir, 'src/main/kotlin/io/cmpose/backendtemplate'), false);
 });
+
+test('backend appName equal to the template name generates without renaming', async (t) => {
+    const { validateBackend } = require('../src/backend/validate');
+    const { generateBackend } = require('../src/backend/generate');
+    const { verifyBackendProject } = require('../src/backend/verifier');
+    const dir = await fixtureCopy(t);
+    await fs.writeFile(path.join(dir, '.template-ref'), 'backend-template-test\n');
+    await fs.writeFile(path.join(dir, '.template-commit'), 'abc1234\n');
+    const { ok, value, errors } = validateBackend({
+        projectName: 'MyApp', appName: 'cmpose-app', packageName: 'com.example.myapp', outputDir: path.resolve('/out')
+    });
+    assert.ok(ok, JSON.stringify(errors));
+    await generateBackend(value, { projectDir: dir, generatorVersion: 'test', now: new Date('2026-11-05T12:00:00Z') });
+    assert.deepEqual(await verifyBackendProject(dir, value), []);
+    assert.ok(await exists(dir, 'deploy/docker-compose.cmpose-app.yml'));
+    assert.ok(await exists(dir, 'deploy/nginx/cmpose-app.conf'));
+    assert.equal(await read(dir, 'settings.gradle.kts'), 'rootProject.name = "cmpose-app"\n');
+    assert.ok(await exists(dir, 'src/main/kotlin/com/example/myapp/Main.kt'));
+});

@@ -152,3 +152,57 @@ test('theme: optional, an object of known fields, colours as #RRGGBB (uppercased
     bad({ ...base, theme: { fontPair: 7 } }, 'theme\\.fontPair');
     bad({ ...base, theme: { mood: 'happy' } }, 'theme has unknown fields: mood');
 });
+test('game appName is trimmed', () => {
+    assert.strictEqual(ok({ ...base, appName: ' Sky ' }).appName, 'Sky');
+    assert.strictEqual(ok({ ...base, appName: '\tSky Hopper\n' }).appName, 'Sky Hopper');
+    bad({ ...base, appName: '   ' }, 'appName');
+});
+test('game names containing the template identity are refused', () => {
+    const b = { ...base, templateType: 'blank' };
+    const refused = (input, field, token) => {
+        const r = validateGame(input);
+        assert.strictEqual(r.ok, false, JSON.stringify(input));
+        assert.ok(r.error.startsWith(field), r.error);
+        assert.ok(r.error.includes(`"${token}"`), r.error);
+    };
+    for (const id of ['UnityBase', 'unitybase', 'UNITYBASE']) {
+        refused({ ...base, projectName: `My${id}Game` }, 'projectName', 'UnityBase');
+        refused({ ...base, companyName: `My${id}` }, 'companyName', 'UnityBase');
+        refused({ ...base, appName: `My ${id} Game` }, 'appName', 'UnityBase');
+        refused({ ...b, features: [`my${id.toLowerCase()}`] }, `features entry "my${id.toLowerCase()}"`, 'UnityBase');
+    }
+    refused({ ...base, packageName: 'com.acme.unitybase' }, 'packageName', 'UnityBase');
+    refused({ ...base, packageName: 'org.com.kturker.x' }, 'packageName', 'com.kturker');
+    // Mixed-case variants are built from the lowercase identity, so they never appear as literals
+    const pkgId = 'com.kturker';
+    const upcaseAt = (s, ...at) => [...s].map((c, i) => (at.includes(i) ? c.toUpperCase() : c)).join('');
+    refused({ ...base, packageName: `${pkgId}x.game` }, 'packageName', 'com.kturker');
+    refused({ ...base, appName: `${upcaseAt(pkgId, 0, 4, 5)}.x` }, 'appName', 'com.kturker');
+    bad({ ...base, packageName: 'com.kturker.x' }, 'packageName');
+    bad({ ...base, packageName: `${upcaseAt(pkgId, 4, 5)}.x` }, 'packageName');
+});
+test('game appName starting with a YAML indicator is refused', () => {
+    for (const c of ['-', "'", '"', '#', '&', '*', '!', '|', '>', '%', '@', '`', '?', ':', ',', '[', ']', '{', '}']) {
+        for (const appName of [`${c}Sky`, ` ${c}Sky `]) {
+            const r = validateGame({ ...base, appName });
+            assert.strictEqual(r.ok, false, appName);
+            assert.ok(r.error.startsWith(`appName must not start with "${c}"`), r.error);
+        }
+    }
+    bad({ ...base, appName: '#1 Game' }, 'appName');
+    bad({ ...base, appName: '&Co' }, 'appName');
+});
+test('game appName with a quote or dash inside is accepted', () => {
+    for (const appName of ["Sky's Edge", 'Sky-Run', ' Sky-Run ']) assert.strictEqual(ok({ ...base, appName }).appName, appName.trim());
+});
+
+test('game packageName and features with a Java-only keyword are refused', () => {
+    for (const seg of ['native', 'final', 'boolean', 'synchronized', 'transient']) {
+        bad({ ...base, packageName: `com.acme.${seg}` }, 'packageName');
+        const r = validateGame({ ...base, templateType: 'blank', features: [seg] });
+        assert.strictEqual(r.ok, false);
+        assert.match(r.error, /is a keyword/);
+    }
+    ok({ ...base, packageName: 'com.acme.natives' });
+    ok({ ...base, templateType: 'blank', features: ['natives'] });
+});

@@ -163,6 +163,17 @@ test('backend_generate uses a local template checkout without its working files'
     assert.match(r.structuredContent.warnings[0], /local template/);
 });
 
+test('backend_generate records a local checkout as local and says the given templateRef was ignored', async (t) => {
+    const { template, outputDir, calls, run } = await setup(t);
+    const r = await run({}, { templateDir: template });
+    assert.notStrictEqual(r.isError, true, textOf(r));
+    assert.deepStrictEqual(calls, []);
+    const record = JSON.parse(await read(path.join(outputDir, 'NotesBackend'), '.cmpose/generation.json'));
+    assert.strictEqual(record.template.ref, 'local');
+    assert.strictEqual(r.structuredContent.warnings[0],
+        `Generated from a local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), not a released tag; templateRef ${REF} was ignored.`);
+});
+
 // Secret files a checkout may hold, at the top and deeper
 const SECRETS = ['.env', 'deploy/.env', 'deploy/prod.env', 'deploy/.env.local', 'AuthKey.p8', 'src/main/resources/tls.pem',
     'deploy/server.key', 'service-account-prod.json', 'deploy/service-account.json', 'google-services.json', 'GoogleService-Info.plist'];

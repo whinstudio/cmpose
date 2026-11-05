@@ -96,7 +96,9 @@ async function applyBackendIdentity(projectDir, { packageName, appName, projectN
         .map((e) => {
             const from = path.join(projectDir, e.rel);
             return { rel: e.rel, from, to: path.join(path.dirname(from), appRename(path.basename(from))) };
-        });
+        })
+        // an appName equal to the template's keeps its names; moving them onto themselves would read as "target exists"
+        .filter((m) => m.to !== m.from);
     const targets = new Set();
     for (const m of moves) {
         if (targets.has(m.to) || (await fs.pathExists(m.to))) throw new Error(`cannot rename ${m.rel}: target exists`);
