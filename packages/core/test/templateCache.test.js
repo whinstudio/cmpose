@@ -86,3 +86,62 @@ test('isCached is false before the first clone and true after it', async () => {
     await assert.rejects(isCached({ ...target, ref: '../x' }), TypeError);
     await remote.cleanup(); await fs.remove(cacheDir);
 });
+
+// A new commit on the fixture's main branch, as a push to the remote would leave it
+function commitOnRemote(dir, file) {
+    const { execFileSync } = require('child_process');
+    const git = (...args) => execFileSync('git', ['-C', dir, '-c', 'gc.auto=0', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();
+    fs.writeFileSync(path.join(dir, file), `${file}\n`);
+    git('add', file);
+    git('commit', '-q', '-m', file);
+    return git('rev-parse', 'HEAD');
+}
+
+test('a tag ref is served from the cache', async () => {
+    const remote = await makeGitTemplateRepo('template-test');
+    const cacheDir = await tmpCache();
+    const first = await ensure({ repo: REPO, ref: 'template-test', cacheDir, remoteUrl: remote.url });
+    // The tag moves on the remote: a cached tag must not ask the remote again
+    commitOnRemote(remote.url, 'moved.txt');
+    require('child_process').execFileSync('git', ['-C', remote.url, 'tag', '-f', 'template-test']);
+    const second = await ensure({ repo: REPO, ref: 'template-test', cacheDir, remoteUrl: remote.url });
+    assert.deepStrictEqual(second, first);
+    assert.strictEqual(await fs.pathExists(path.join(second.dir, 'moved.txt')), false);
+    await remote.cleanup();
+    await fs.remove(cacheDir);
+});
+
+test('a branch ref picks up a new commit', async () => {
+    const { isCached } = require('../src/templateCache');
+    const remote = await makeGitTemplateRepo('template-test');
+    const cacheDir = await tmpCache();
+    const target = { repo: REPO, ref: 'main', cacheDir, remoteUrl: remote.url };
+    const first = await ensure(target);
+    assert.strictEqual(first.commit, remote.commit);
+    assert.strictEqual((await fs.readFile(path.join(first.dir, '.template-ref'), 'utf8')).trim(), 'refs/heads/main');
+    assert.strictEqual(await isCached(target), false); // a branch always asks the remote
+
+    const next = commitOnRemote(remote.url, 'added.txt');
+    const second = await ensure(target);
+    assert.strictEqual(second.dir, first.dir);
+    assert.strictEqual(second.commit, next);
+    assert.strictEqual(await fs.readFile(path.join(second.dir, 'added.txt'), 'utf8'), 'added.txt\n');
+    assert.deepStrictEqual(await fs.readdir(path.dirname(second.dir)), ['main']); // the old clone is gone
+
+    // Unchanged branch: same commit, and an unreachable remote is an error, not a stale answer
+    assert.deepStrictEqual(await ensure(target), second);
+    await remote.cleanup();
+    await assert.rejects(ensure(target), TemplateFetchError);
+    await fs.remove(cacheDir);
+});
+
+test('a full commit SHA is cloned once and served from the cache', async () => {
+    const remote = await makeGitTemplateRepo('template-test');
+    const cacheDir = await tmpCache();
+    const first = await ensure({ repo: REPO, ref: remote.commit, cacheDir, remoteUrl: remote.url });
+    assert.strictEqual(first.commit, remote.commit);
+    assert.strictEqual(await fs.pathExists(path.join(first.dir, '.git')), false);
+    await remote.cleanup(); // immutable: no remote needed the second time
+    assert.deepStrictEqual(await ensure({ repo: REPO, ref: remote.commit, cacheDir, remoteUrl: remote.url }), first);
+    await fs.remove(cacheDir);
+});
