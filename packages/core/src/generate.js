@@ -9,6 +9,7 @@ const {
     cleanImlFiles, wireFeatureModules, processBlankApp, sortKotlinImports, INSIGHTS_DIR
 } = require('./fileService');
 const { applyBlankShell, cloneFeatureModules, assertTemplateCapabilities } = require('./featureModules');
+const { SHOWCASE_FEATURES } = require('./showcaseModules');
 const { applyCiOption } = require('./ciOption');
 const { applyBackendOption } = require('./backendOption');
 const { writePrivacyManifest } = require('./privacyManifest');
@@ -64,7 +65,7 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
     let sanitizedFeatures = (features || []).map((f) => f.toLowerCase().trim());
     // Showcase's home and onboarding have custom dependencies: never regenerated
     if (templateType === 'showcase') {
-        sanitizedFeatures = sanitizedFeatures.filter((f) => f !== 'home' && f !== 'onboarding');
+        sanitizedFeatures = sanitizedFeatures.filter((f) => !SHOWCASE_FEATURES.includes(f));
     }
 
     // blank's shell and every requested module come from the template, applied on the
@@ -137,7 +138,7 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
         features: sanitizedFeatures,
         versions,
         serverTemplate,
-        warnings: generationWarnings({ templateType, featuresConfig, insights: insightsOn })
+        warnings: generationWarnings({ templateType, featuresConfig, insights: insightsOn, features })
     };
 }
 

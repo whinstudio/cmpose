@@ -47,6 +47,8 @@ function coerceVersions(options) {
 
 const BACKEND_REF_IGNORED = 'backendTemplateRef ignored: featuresConfig.backend is off';
 const LOCAL_BACKEND_WARNING = 'server/ was generated from a local backend template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), not a released tag.';
+const localBackendWarning = (ref) => (ref === undefined ? LOCAL_BACKEND_WARNING
+    : `${LOCAL_BACKEND_WARNING.slice(0, -1)}; backendTemplateRef ${ref} was ignored.`);
 
 // Blank with backend: server/ comes from the backend template (validated value, or the raw args with the defaults)
 const usesBackendTemplate = ({ templateType = DEFAULTS.templateType, featuresConfig } = {}) =>
@@ -128,7 +130,7 @@ async function runGenerate(args, {
             warnings.push('featuresConfig is ignored for showcase (it applies to blank only); the showcase template has its own fixed feature set');
         }
         if (!withBackend && backendTemplateRef !== undefined) warnings.push(BACKEND_REF_IGNORED);
-        if (backend && backend.local) warnings.push(LOCAL_BACKEND_WARNING, ...backendWarnings);
+        if (backend && backend.local) warnings.push(localBackendWarning(backendTemplateRef), ...backendWarnings);
         const result = {
             projectDir: target,
             template: { repo: core.pins.cmp.repo, ref: cache.ref, commit: cache.commit },

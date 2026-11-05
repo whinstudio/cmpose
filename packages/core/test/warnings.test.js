@@ -40,3 +40,38 @@ test('insights on warns about the config files', () => {
     // Backend and insights both on: both warnings
     assert.strictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { backend: true, insights: true } }).length, 2);
 });
+
+test('networkBaseUrl without network warns', () => {
+    const message = 'featuresConfig.networkBaseUrl was not used: it applies only with featuresConfig.network on.';
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { network: false, networkBaseUrl: 'https://api.example.com' } }), [message]);
+    // Used, empty or blank: nothing was dropped
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { network: true, networkBaseUrl: 'https://api.example.com' } }), []);
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { network: false, networkBaseUrl: '  ' } }), []);
+    // Showcase ignores featuresConfig as a whole (the MCP says so once)
+    assert.ok(!generationWarnings({ templateType: 'showcase', featuresConfig: { networkBaseUrl: 'https://api.example.com' } }).includes(message));
+});
+
+test('detektYamlContent without detekt warns', () => {
+    const message = 'featuresConfig.detektYamlContent was not used: it applies only with featuresConfig.detekt on.';
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { detekt: false, detektYamlContent: 'build:\n  maxIssues: 0\n' } }), [message]);
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { detekt: true, detektYamlContent: 'build:\n  maxIssues: 0\n' } }), []);
+    assert.deepStrictEqual(generationWarnings({ templateType: 'blank', featuresConfig: { detekt: false, detektYamlContent: '' } }), []);
+});
+
+test('showcase features naming a template module warn', () => {
+    const own = (features) => generationWarnings({ templateType: 'showcase', featuresConfig: null, features })
+        .filter((w) => /^features /.test(w));
+    assert.deepStrictEqual(own(['home']),
+        ["features home were not generated: they are the template's own modules (already in the project)."]);
+    // profile is a custom module and is generated: only home is named
+    assert.deepStrictEqual(own(['home', 'profile']),
+        ["features home were not generated: they are the template's own modules (already in the project)."]);
+    assert.deepStrictEqual(own(['onboarding', 'home']),
+        ["features onboarding, home were not generated: they are the template's own modules (already in the project)."]);
+    // Not asked for, or only custom modules: no warning
+    assert.deepStrictEqual(own(undefined), []);
+    assert.deepStrictEqual(own([]), []);
+    assert.deepStrictEqual(own(['profile']), []);
+    // Blank clones home and onboarding like any custom module
+    assert.ok(!generationWarnings({ templateType: 'blank', featuresConfig: {}, features: ['home'] }).some((w) => /^features /.test(w)));
+});

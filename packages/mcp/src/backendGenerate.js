@@ -49,8 +49,9 @@ async function runBackendGenerate(args, {
         if (late) throw new Error(late);
         await removeEmptyDir(target); // never recursive: a concurrent run's project stays intact
         await fs.rename(work, target);
-        const warnings = cache.local
-            ? ['Generated from a local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), not a released tag.', ...localWarnings] : [];
+        const localWarning = 'Generated from a local template checkout (CMPOSE_BACKEND_TEMPLATE_DIR), not a released tag'
+            + (value.templateRef !== undefined ? `; templateRef ${value.templateRef} was ignored.` : '.');
+        const warnings = cache.local ? [localWarning, ...localWarnings] : [];
         const result = {
             projectDir: target, sharing: value.sharing, sample: value.sample, template: record.template, record, warnings, nextSteps: NEXT_STEPS_BACKEND
         };
