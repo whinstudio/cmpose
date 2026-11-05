@@ -173,10 +173,13 @@ test('game names containing the template identity are refused', () => {
     }
     refused({ ...base, packageName: 'com.acme.unitybase' }, 'packageName', 'UnityBase');
     refused({ ...base, packageName: 'org.com.kturker.x' }, 'packageName', 'com.kturker');
-    refused({ ...base, packageName: 'com.kturkerx.game' }, 'packageName', 'com.kturker');
-    refused({ ...base, appName: 'Com.KTurker.x' }, 'appName', 'com.kturker');
+    // Mixed-case variants are built from the lowercase identity, so they never appear as literals
+    const pkgId = 'com.kturker';
+    const upcaseAt = (s, ...at) => [...s].map((c, i) => (at.includes(i) ? c.toUpperCase() : c)).join('');
+    refused({ ...base, packageName: `${pkgId}x.game` }, 'packageName', 'com.kturker');
+    refused({ ...base, appName: `${upcaseAt(pkgId, 0, 4, 5)}.x` }, 'appName', 'com.kturker');
     bad({ ...base, packageName: 'com.kturker.x' }, 'packageName');
-    bad({ ...base, packageName: 'com.KTurker.x' }, 'packageName');
+    bad({ ...base, packageName: `${upcaseAt(pkgId, 4, 5)}.x` }, 'packageName');
 });
 test('game appName starting with a YAML indicator is refused', () => {
     for (const c of ['-', "'", '"', '#', '&', '*', '!', '|', '>', '%', '@', '`', '?', ':', ',', '[', ']', '{', '}']) {
@@ -191,4 +194,15 @@ test('game appName starting with a YAML indicator is refused', () => {
 });
 test('game appName with a quote or dash inside is accepted', () => {
     for (const appName of ["Sky's Edge", 'Sky-Run', ' Sky-Run ']) assert.strictEqual(ok({ ...base, appName }).appName, appName.trim());
+});
+
+test('game packageName and features with a Java-only keyword are refused', () => {
+    for (const seg of ['native', 'final', 'boolean', 'synchronized', 'transient']) {
+        bad({ ...base, packageName: `com.acme.${seg}` }, 'packageName');
+        const r = validateGame({ ...base, templateType: 'blank', features: [seg] });
+        assert.strictEqual(r.ok, false);
+        assert.match(r.error, /is a keyword/);
+    }
+    ok({ ...base, packageName: 'com.acme.natives' });
+    ok({ ...base, templateType: 'blank', features: ['natives'] });
 });
