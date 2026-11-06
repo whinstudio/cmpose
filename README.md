@@ -6,7 +6,7 @@ Ask your agent for an app ("a blank Compose Multiplatform app called Habits with
 theming") and get a buildable Android + iOS project from a tested template: Koin, Navigation,
 Ktor, Room, DataStore, theming, multi-language, RevenueCat purchases, AdMob ads, detekt,
 backend (Ktor server, Firebase sign-in, sharing; blank only; turns on multi-language and
-networking) and CI as options. What each option adds: [packages/mcp/README.md](packages/mcp/README.md).
+networking), insights (Firebase Crashlytics + Analytics) and CI as options. What each option adds: [packages/mcp/README.md](packages/mcp/README.md).
 
 It also generates Unity mobile games ("a 2D Unity game called SkyHopper with ads and
 leaderboards"): a Unity 6 (URP) Android + iOS project from the pinned game template
@@ -98,8 +98,8 @@ version and pins one tag of each template, so a given version always generates t
     npm test
     npm run scan    # public hygiene scan: private paths, names, addresses, secrets
 
-The 5 real-template tests in `packages/core/test/fileService.importSort.test.js` run only
-when `CMP_REAL_TEMPLATE_DIR` points to a checkout of the template, e.g.
+The 5 real-template tests in `packages/core/test/fileService.importSort.test.js` and the ones
+in `generate.insights.real.test.js` run only when `CMP_REAL_TEMPLATE_DIR` points to a checkout of the template, e.g.
 `CMP_REAL_TEMPLATE_DIR=/path/to/template-checkout npm test`; otherwise they are skipped.
 
 `CMPOSE_BACKEND_TEMPLATE_DIR` points to a checkout of the backend template (an absolute path).
