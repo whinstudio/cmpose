@@ -1,6 +1,6 @@
 # cmpose
 
-Generate Compose Multiplatform projects on your own machine — from any AI agent, through MCP.
+Generate Compose Multiplatform apps, Unity games and Ktor backends on your own machine — from any AI agent, through MCP.
 
 Ask your agent for an app ("a blank Compose Multiplatform app called Habits with Room and
 theming") and get a buildable Android + iOS project from a tested template: Koin, Navigation,
