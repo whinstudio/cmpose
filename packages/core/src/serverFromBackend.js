@@ -53,7 +53,8 @@ async function writeLocalServerDir(serverDir) {
 
 /** Moves a fresh backend template copy (backendTemplate.dir) to <projectDir>/server and generates it there. Fails when
  * server/ already exists. Returns the server's appName, package and template.
- * On a failure part way, server/ may be half written: the caller discards the project dir. */
+ * On a failure after the move, server/ is removed and the error rethrown: a caller that keeps the project dir is not
+ * left with a half written server/ (the raw copy is gone either way, it was moved). */
 async function placeServer(projectDir, { packageName, projectName, backendTemplate, generatorVersion = null, now = new Date() }) {
     const { dir, repo = null, ref = null, commit = null } = backendTemplate || {};
     if (!dir) throw new Error('backend: the backend template is required (backendTemplate)');
@@ -63,20 +64,25 @@ async function placeServer(projectDir, { packageName, projectName, backendTempla
     // 1. move: a rename on the same file system, otherwise a copy and a removal
     await fs.move(dir, serverDir);
 
-    // 2. generate
-    const appName = deriveServerAppName(projectName);
-    const serverPackage = serverPackageOf(packageName);
-    await generateBackend({ projectName, appName, packageName: serverPackage, sharing: true, sample: false }, {
-        projectDir: serverDir, templateRef: ref, templateCommit: commit, generatorVersion, now
-    });
+    try {
+        // 2. generate
+        const appName = deriveServerAppName(projectName);
+        const serverPackage = serverPackageOf(packageName);
+        await generateBackend({ projectName, appName, packageName: serverPackage, sharing: true, sample: false }, {
+            projectDir: serverDir, templateRef: ref, templateCommit: commit, generatorVersion, now
+        });
 
-    // 3. the local server's folder is the project root's .local-server/
-    await writeLocalServerDir(serverDir);
+        // 3. the local server's folder is the project root's .local-server/
+        await writeLocalServerDir(serverDir);
 
-    // 4. leftovers
-    for (const leftover of SERVER_LEFTOVERS) await fs.remove(path.join(serverDir, leftover));
-    log.info(`✅ Server ready (${appName}, ${serverPackage})`);
-    return { appName, packageName: serverPackage, template: { repo, ref, commit } };
+        // 4. leftovers
+        for (const leftover of SERVER_LEFTOVERS) await fs.remove(path.join(serverDir, leftover));
+        log.info(`✅ Server ready (${appName}, ${serverPackage})`);
+        return { appName, packageName: serverPackage, template: { repo, ref, commit } };
+    } catch (e) {
+        await fs.remove(serverDir);
+        throw e;
+    }
 }
 
 module.exports = { deriveServerAppName, placeServer, serverPackageOf, SERVER_DIR, LOCAL_SERVER_DIR_LINE, INCLUDE_SERVER_BUILD };

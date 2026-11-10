@@ -675,20 +675,25 @@ const run = (command, args, options) => new Promise((resolve) => {
 const DOCKER_INFO_TIMEOUT_MS = 20000;
 const DOCKER_BUILD_TIMEOUT_MS = 30 * 60 * 1000;
 
+// execFile's timeout kills the docker client only: the BuildKit build it started goes on in the daemon
+const BUILD_TIMED_OUT = `the image build timed out after ${DOCKER_BUILD_TIMEOUT_MS / 60000} min; the BuildKit build may still be running (docker buildx stop stops it)`;
+const timedOut = (error) => error.killed === true && error.signal === 'SIGTERM';
+
 /** The server image check: docker build -f server/deploy/Dockerfile server. { status: 'PASS' | 'SKIP' | 'FAIL', detail };
- * SKIP when Docker (the docker command and its daemon) is not available */
-async function checkServerImage(projectPath, { docker = 'docker' } = {}) {
-    const info = await run(docker, ['info', '--format', '{{.ServerVersion}}'], { timeout: DOCKER_INFO_TIMEOUT_MS });
+ * SKIP when Docker (the docker command and its daemon) is not available. runCommand: the tests' stand-in for run */
+async function checkServerImage(projectPath, { docker = 'docker', runCommand = run } = {}) {
+    const info = await runCommand(docker, ['info', '--format', '{{.ServerVersion}}'], { timeout: DOCKER_INFO_TIMEOUT_MS });
     if (info.error) return { status: 'SKIP', detail: 'Docker is not available' };
-    const build = await run(docker, ['build', '--quiet', '-f', path.join(SERVER_DIR, 'deploy', 'Dockerfile'), SERVER_DIR],
+    const build = await runCommand(docker, ['build', '--quiet', '-f', path.join(SERVER_DIR, 'deploy', 'Dockerfile'), SERVER_DIR],
         { cwd: projectPath, timeout: DOCKER_BUILD_TIMEOUT_MS });
     if (build.error) {
+        if (timedOut(build.error)) return { status: 'FAIL', detail: BUILD_TIMED_OUT };
         const tail = `${build.stderr || build.error.message}`.trim().split('\n').slice(-5).join(' | ');
         return { status: 'FAIL', detail: tail };
     }
     // The image itself is not kept (the build cache is)
     const image = build.stdout.trim().split('\n').pop();
-    if (image) await run(docker, ['image', 'rm', image], { timeout: DOCKER_INFO_TIMEOUT_MS });
+    if (image) await runCommand(docker, ['image', 'rm', image], { timeout: DOCKER_INFO_TIMEOUT_MS });
     return { status: 'PASS', detail: image };
 }
 
