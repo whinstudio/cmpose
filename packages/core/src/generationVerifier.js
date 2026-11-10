@@ -641,6 +641,21 @@ async function verifyBackend(projectPath, input, cfg, problems) {
     }
 }
 
+// The purchases and ads blocks are resolved in every Kotlin file (applyMonetizationMarkers): a marker line left
+// means a file the walk missed
+const MONETIZATION_MARKERS = ['// cmpose:purchases', '// /cmpose:purchases', '// cmpose:ads', '// /cmpose:ads'];
+const MONETIZATION_MARKER_FILES = new Set(['.kt', '.kts']);
+
+async function verifyMonetizationMarkers(projectPath, problems) {
+    for (const file of await listTextFiles(projectPath)) {
+        if (!MONETIZATION_MARKER_FILES.has(path.extname(file))) continue;
+        for (const line of (await fs.readFile(file, 'utf8')).split('\n')) {
+            const marker = MONETIZATION_MARKERS.find((m) => line.trim().startsWith(m));
+            if (marker) problems.add(`${relPath(projectPath, file)}: ${marker} marker left`);
+        }
+    }
+}
+
 // One version for both platforms (the server's X-Client-Version check compares it): the iOS MARKETING_VERSION equals
 // AppConfig.versionName. Keyed on both values, so a template without them (staging, an older tag) is not checked.
 async function verifyAppVersion(projectPath, problems) {
@@ -821,6 +836,9 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
     // 14. Backend: the server and its modules exactly when blank's backend flag is on, no residue otherwise
     await verifyBackend(projectPath, input, input.featuresConfig || {}, problems);
 
+    // 14b. No purchases or ads marker line left in a Kotlin file
+    await verifyMonetizationMarkers(projectPath, problems);
+
     // 15. One app version for both platforms
     await verifyAppVersion(projectPath, problems);
 
@@ -840,4 +858,4 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
     }
 }
 
-module.exports = { verifyGeneratedProject, verifyBackend, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };
+module.exports = { verifyGeneratedProject, verifyBackend, verifyMonetizationMarkers, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };

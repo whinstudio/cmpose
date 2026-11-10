@@ -59,6 +59,31 @@ test('a broken copy fails instead of returning a project', async () => {
     await fs.remove(projectDir);
 });
 
+test('blank purchases=true, ads=false keeps the purchases block of MainScreen and drops the ads block', async (t) => {
+    const projectDir = await freshCopy();
+    t.after(() => fs.remove(projectDir));
+    const mainScreen = [`package ${OLD_PACKAGE_NAME}`, '', 'fun mainScreen() {',
+        '    LocalStringResources provides strings', '    setSystemLanguage()', '    // cmpose:purchases', '    paywallOnFirstLaunch()',
+        '    // /cmpose:purchases', '', '    // cmpose:ads', '    interstitialPacer()', '    // /cmpose:ads', '}', ''].join('\n');
+    for (const shell of ['blank/shared', 'blank/layers/multilang/shared']) {
+        await fs.outputFile(path.join(projectDir, shell, 'src/commonMain/kotlin', OLD_PACKAGE_PATH, 'MainScreen.kt'), mainScreen);
+    }
+    // Purchases on: the modules it keeps, wired as the verifier expects
+    for (const module of ['core/purchases', 'feature/monetization/presentation']) {
+        await fs.outputFile(path.join(projectDir, module, 'build.gradle.kts'), 'plugins { }\n');
+    }
+    await fs.outputFile(path.join(projectDir, 'shared/src/commonMain/kotlin', OLD_PACKAGE_PATH, 'di/initKoin.kt'),
+        `package ${OLD_PACKAGE_NAME}.di\n\nfun modules() {\n    add(PurchasesModule().module)\n    add(MonetizationPresentationModule().module)\n}\n`);
+    const { value, error } = validate({ projectName: 'Demo', appName: 'Demo App', packageName: 'com.example.demo', minSdk: '24', iosVersion: '15.0',
+        templateType: 'blank', featuresConfig: { multiLang: true, purchases: true, ads: false } });
+    assert.ok(value, error);
+    await generateCmpProject(value, { projectDir });
+    const generated = await fs.readFile(path.join(projectDir, 'shared/src/commonMain/kotlin/com/example/demo/MainScreen.kt'), 'utf8');
+    assert.match(generated, /^    paywallOnFirstLaunch\(\)$/m);
+    assert.doesNotMatch(generated, /interstitialPacer/);
+    assert.doesNotMatch(generated, /cmpose:/);
+});
+
 // The seeded slice plus the backend's parts, marked as the template marks them (MAINTAINING.md → Backend markers)
 async function seedBackendSlice(dir) {
     const block = (open, lines, close) => [open, ...lines, close].join('\n');
