@@ -76,6 +76,11 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
     // Firebase setup it shares with insights stays while either is on.
     await applyBackendOption(projectDir, { enabled: backendOn, firebase: backendOn || insightsOn });
     await cloneFeatureModules(projectDir, sanitizedFeatures);
+    // The purchases and ads blocks in the Kotlin sources follow blank's flags; showcase keeps both (markers dropped).
+    // Before processBlankApp: its monetization residue check must not see the text of a block that goes.
+    await applyMonetizationMarkers(projectDir, templateType === 'blank'
+        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true }
+        : { purchases: true, ads: true });
     log.info(`✅ Template skeleton ready (${sanitizedFeatures.length} feature modules)`);
 
     await processAllFiles(projectDir, OLD_PACKAGE_NAME, packageName, OLD_PROJECT_NAME, projectName, appName, { minSdk, iosVersion });
@@ -93,11 +98,6 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
         await wireFeatureModules(projectDir, packageName, sanitizedFeatures);
         log.info(`✅ Wired ${sanitizedFeatures.length} feature modules`);
     }
-
-    // The purchases and ads blocks in the Kotlin sources follow blank's flags; showcase keeps both (markers dropped)
-    await applyMonetizationMarkers(projectDir, templateType === 'blank'
-        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true }
-        : { purchases: true, ads: true });
 
     // The CI workflow is opt-in; after processBlankApp, which drops its detekt step when detekt is off
     await applyCiOption(projectDir, ci);

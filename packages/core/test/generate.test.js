@@ -84,6 +84,28 @@ test('blank purchases=true, ads=false keeps the purchases block of MainScreen an
     assert.doesNotMatch(generated, /cmpose:/);
 });
 
+test('blank purchases=false: a purchases block naming a residue token goes before the residue check', async (t) => {
+    const projectDir = await freshCopy();
+    t.after(() => fs.remove(projectDir));
+    // The multilang layer's strings: the paywall's text names PurchasesKeys, a purchases residue token
+    const strings = [`package ${OLD_PACKAGE_NAME}.core.multilang.resource.res`, '', 'val resourceEN = Strings(',
+        '    // cmpose:purchases', '    paywallPurchasesDisabled = "Set the keys in PurchasesKeys",', '    // /cmpose:purchases',
+        '    updateRestart = "Restart"', ')', ''].join('\n');
+    await fs.outputFile(path.join(projectDir, 'blank/layers/multilang/core/multilang/src/commonMain/kotlin', OLD_PACKAGE_PATH,
+        'core/multilang/resource/res/ResourcesEN.kt'), strings);
+    // The multilang shell the verifier expects
+    await fs.outputFile(path.join(projectDir, 'blank/layers/multilang/shared/src/commonMain/kotlin', OLD_PACKAGE_PATH, 'MainScreen.kt'),
+        [`package ${OLD_PACKAGE_NAME}`, '', 'fun mainScreen() {', '    LocalStringResources provides strings', '    setSystemLanguage()', '}', ''].join('\n'));
+    const { value, error } = validate({ projectName: 'Demo', appName: 'Demo App', packageName: 'com.example.demo', minSdk: '24', iosVersion: '15.0',
+        templateType: 'blank', featuresConfig: { multiLang: true, purchases: false, ads: false } });
+    assert.ok(value, error);
+    await generateCmpProject(value, { projectDir });
+    const generated = await fs.readFile(path.join(projectDir,
+        'core/multilang/src/commonMain/kotlin/com/example/demo/core/multilang/resource/res/ResourcesEN.kt'), 'utf8');
+    assert.doesNotMatch(generated, /PurchasesKeys|cmpose:/);
+    assert.match(generated, /updateRestart = "Restart"/);
+});
+
 // The seeded slice plus the backend's parts, marked as the template marks them (MAINTAINING.md → Backend markers)
 async function seedBackendSlice(dir) {
     const block = (open, lines, close) => [open, ...lines, close].join('\n');
