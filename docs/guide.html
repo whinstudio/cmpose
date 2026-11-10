@@ -2005,7 +2005,7 @@ fun ErrorContent(
         KtText(
             text = message,
             textAlign = TextAlign.Center,
-            color = LocalColorsPalette.current.textBlack
+            color = LocalColorsPalette.current.textPrimary
         )
 
         Button(onClick = onRetry) {
@@ -3482,11 +3482,17 @@ enum class ThemeMode {
                         <code>LocalColorsPalette</code> and applies <code>MaterialTheme</code> with a color scheme
                         derived from it: <code>background</code> and <code>surface</code> from
                         <code>backgroundColor</code>, <code>onBackground</code> and <code>onSurface</code> from
-                        <code>textBlack</code>, <code>onSurfaceVariant</code> from <code>textGray</code>,
-                        <code>primary</code> from <code>tintBlack</code>, <code>onPrimary</code> from
+                        <code>textPrimary</code>, <code>onSurfaceVariant</code> from <code>textSecondary</code>,
+                        <code>primary</code> from <code>tintPrimary</code>, <code>onPrimary</code> from
                         <code>backgroundColor</code>, <code>outline</code> from <code>textFieldUnFocusedBorder</code>.
                         Other roles keep Material's light or dark defaults. Add typography and shapes to its
                         <code>MaterialTheme</code> call.
+                    </p>
+                    <p>
+                        Projects generated before cmpose 3.0.0 name these fields after a colour: <code>textBlack</code>
+                        (now <code>textPrimary</code>), <code>textGray</code> (<code>textSecondary</code>),
+                        <code>tintBlack</code> (<code>tintPrimary</code>) and <code>tintGrey</code>
+                        (<code>tintSecondary</code>). They hold the same colours; rename them if you like.
                     </p>
 
                     <div class="code-wrapper">
@@ -3527,13 +3533,13 @@ internal fun colorSchemeFor(
     palette: CustomColorsPalette,
     darkTheme: Boolean
 ): ColorScheme = (if (darkTheme) darkColorScheme() else lightColorScheme()).copy(
-    primary = palette.tintBlack,
+    primary = palette.tintPrimary,
     onPrimary = palette.backgroundColor,
     background = palette.backgroundColor,
-    onBackground = palette.textBlack,
+    onBackground = palette.textPrimary,
     surface = palette.backgroundColor,
-    onSurface = palette.textBlack,
-    onSurfaceVariant = palette.textGray,
+    onSurface = palette.textPrimary,
+    onSurfaceVariant = palette.textSecondary,
     outline = palette.textFieldUnFocusedBorder
 )</code></pre>
                     </div>
@@ -3620,27 +3626,27 @@ internal fun AppTheme(
                         <pre><code class="language-kotlin">@Immutable
 data class CustomColorsPalette(
     val backgroundColor: Color = Color.Unspecified,
-    val textBlack: Color = Color.Unspecified,
-    val textGray: Color = Color.Unspecified,
-    val tintBlack: Color = Color.Unspecified,
+    val textPrimary: Color = Color.Unspecified,
+    val textSecondary: Color = Color.Unspecified,
+    val tintPrimary: Color = Color.Unspecified,
     val textFieldUnFocusedBorder: Color = Color.Unspecified,
     val accent: Color = Color.Unspecified // your own color
 )
 
 val OnLightColorsPalette = CustomColorsPalette(
     backgroundColor = Color(color = 0xFFFFFFFF),
-    textBlack = Color(color = 0xFF080B0E),
-    textGray = Color(color = 0xFF8B959E),
-    tintBlack = Color(color = 0xFF080B0E),
+    textPrimary = Color(color = 0xFF080B0E),
+    textSecondary = Color(color = 0xFF8B959E),
+    tintPrimary = Color(color = 0xFF080B0E),
     textFieldUnFocusedBorder = Color(color = 0xFFCCCCCC),
     accent = Color(color = 0xFF0A84FF)
 )
 
 val OnDarkColorsPalette = CustomColorsPalette(
     backgroundColor = Color(color = 0xFF202326),
-    textBlack = Color(color = 0xFFFFFFFF),
-    textGray = Color(color = 0x80FFFFFF),
-    tintBlack = Color(color = 0xFFFFFFFF),
+    textPrimary = Color(color = 0xFFFFFFFF),
+    textSecondary = Color(color = 0x80FFFFFF),
+    tintPrimary = Color(color = 0xFFFFFFFF),
     textFieldUnFocusedBorder = Color(color = 0xFF555555),
     accent = Color(color = 0xFF409CFF)
 )</code></pre>
