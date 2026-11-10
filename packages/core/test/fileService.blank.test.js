@@ -262,6 +262,46 @@ test('Theming on: the theme packages stay and the palette keeps exactly the colo
     });
 });
 
+// CustomColorsPalette.kt of a pre-3.0.0 template (a templateRef to an older tag): KtTheme read the old names
+const OLD_NAMES_PALETTE = (fields) => [
+    ...PALETTE_HEAD,
+    '@Immutable',
+    'data class CustomColorsPalette(',
+    fields.map((f) => `    val ${f}: Color = Color.Unspecified`).join(',\n'),
+    ')',
+    '',
+    'val OnLightColorsPalette = CustomColorsPalette(',
+    fields.map((f) => `    ${f} = Color(color = 0xFF000000)`).join(',\n'),
+    ')',
+    ''
+].join('\n');
+
+const OLD_READ_FIELDS = ['backgroundColor', 'textBlack', 'textGray', 'tintBlack', 'textFieldUnFocusedBorder'];
+
+test('Theming on: a palette with the pre-3.0.0 names keeps the fields the older KtTheme reads', async (t) => {
+    t.mock.method(console, 'log', () => { });
+    await withTempDir(async (dir) => {
+        await seed(dir);
+        await fs.outputFile(path.join(dir, `${DS}/theme/CustomColorsPalette.kt`),
+            OLD_NAMES_PALETTE([...OLD_READ_FIELDS.slice(0, 3), 'buttonBackground', ...OLD_READ_FIELDS.slice(3)]));
+        await processBlankApp(dir, NEW_PACKAGE, [], config({ multiLang: false }));
+
+        assert.equal(await read(dir, `${DS}/theme/CustomColorsPalette.kt`), OLD_NAMES_PALETTE(OLD_READ_FIELDS));
+    });
+});
+
+test('Theming on: a hand-edited palette with both old and new names keeps both', async (t) => {
+    t.mock.method(console, 'log', () => { });
+    await withTempDir(async (dir) => {
+        const mixed = ['textPrimary', 'textBlack', 'tintPrimary', 'tintBlack'];
+        await seed(dir);
+        await fs.outputFile(path.join(dir, `${DS}/theme/CustomColorsPalette.kt`), OLD_NAMES_PALETTE([...mixed, 'tintSecondary']));
+        await processBlankApp(dir, NEW_PACKAGE, [], config({ multiLang: false }));
+
+        assert.equal(await read(dir, `${DS}/theme/CustomColorsPalette.kt`), OLD_NAMES_PALETTE(mixed));
+    });
+});
+
 test('Theming and Multi-Language off: core/designsystem goes; core/database keeps DataStore without theme/', async (t) => {
     t.mock.method(console, 'log', () => { });
     await withTempDir(async (dir) => {

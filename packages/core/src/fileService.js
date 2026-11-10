@@ -65,8 +65,13 @@ function escapeRegExp(s) {
 
 // The theme lives in these modules' `theme` package; Theming off removes it
 const THEME_MODULES = ['designsystem', 'database'];
-// The palette fields KtTheme (core/designsystem/.../theme/KtTheme.kt) maps to Material roles
-const KT_THEME_PALETTE_FIELDS = ['backgroundColor', 'textPrimary', 'textSecondary', 'tintPrimary', 'textFieldUnFocusedBorder'];
+// The palette fields KtTheme (core/designsystem/.../theme/KtTheme.kt) maps to Material roles.
+// textBlack/textGray/tintBlack are the names KtTheme read before 3.0.0: a templateRef to an older
+// template tag still ships them, so they stay and that project still compiles
+const KT_THEME_PALETTE_FIELDS = [
+    'backgroundColor', 'textPrimary', 'textSecondary', 'tintPrimary', 'textFieldUnFocusedBorder',
+    'textBlack', 'textGray', 'tintBlack'
+];
 // `val name: Color = ...` in the palette class, or `name = Color...` in a palette value
 const PALETTE_FIELD_LINE = /^\s*(?:val\s+)?(\w+)(?::\s*Color)?\s*=\s*Color\b/;
 // The network lines FeatureDataConventionPlugin.kt carries (the Ktor engines live in core/network)
