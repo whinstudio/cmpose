@@ -2025,8 +2025,9 @@ async function processCoreFeatures(projectPath, config, packageName) {
             (line) => /\bPurchasesModule\b/.test(line)
         );
 
-        // 3b. MainScreen.kt: FirstLaunchPaywall's import, comment and call (the template keeps the comment and the
-        // call as the screen's last lines, so nothing but them goes)
+        // 3b. MainScreen.kt: FirstLaunchPaywall's import, comment and call. This step runs only for blank
+        // projects (processCoreFeatures); blank keeps the comment and the call inside AppTheme, and every line
+        // naming FirstLaunchPaywall goes, so the comment must keep naming it to go with the call
         await dropLines(
             path.join(projectPath, 'shared', 'src', 'commonMain', 'kotlin', packagePath, 'MainScreen.kt'),
             (line) => /\bFirstLaunchPaywall\b/.test(line)
