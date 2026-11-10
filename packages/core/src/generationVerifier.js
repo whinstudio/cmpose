@@ -641,6 +641,21 @@ async function verifyBackend(projectPath, input, cfg, problems) {
     }
 }
 
+// The purchases and ads blocks are resolved in every Kotlin file (applyMonetizationMarkers): a marker line left
+// means a file the walk missed
+const MONETIZATION_MARKERS = ['// cmpose:purchases', '// /cmpose:purchases', '// cmpose:ads', '// /cmpose:ads'];
+const MONETIZATION_MARKER_FILES = new Set(['.kt', '.kts']);
+
+async function verifyMonetizationMarkers(projectPath, problems) {
+    for (const file of await listTextFiles(projectPath)) {
+        if (!MONETIZATION_MARKER_FILES.has(path.extname(file))) continue;
+        for (const line of (await fs.readFile(file, 'utf8')).split('\n')) {
+            const marker = MONETIZATION_MARKERS.find((m) => line.trim().startsWith(m));
+            if (marker) problems.add(`${relPath(projectPath, file)}: ${marker} marker left`);
+        }
+    }
+}
+
 // One version for both platforms (the server's X-Client-Version check compares it): the iOS MARKETING_VERSION equals
 // AppConfig.versionName. Keyed on both values, so a template without them (staging, an older tag) is not checked.
 async function verifyAppVersion(projectPath, problems) {
@@ -660,20 +675,25 @@ const run = (command, args, options) => new Promise((resolve) => {
 const DOCKER_INFO_TIMEOUT_MS = 20000;
 const DOCKER_BUILD_TIMEOUT_MS = 30 * 60 * 1000;
 
+// execFile's timeout kills the docker client only: the BuildKit build it started goes on in the daemon
+const BUILD_TIMED_OUT = `the image build timed out after ${DOCKER_BUILD_TIMEOUT_MS / 60000} min; the BuildKit build may still be running (docker buildx stop stops it)`;
+const timedOut = (error) => error.killed === true && error.signal === 'SIGTERM';
+
 /** The server image check: docker build -f server/deploy/Dockerfile server. { status: 'PASS' | 'SKIP' | 'FAIL', detail };
- * SKIP when Docker (the docker command and its daemon) is not available */
-async function checkServerImage(projectPath, { docker = 'docker' } = {}) {
-    const info = await run(docker, ['info', '--format', '{{.ServerVersion}}'], { timeout: DOCKER_INFO_TIMEOUT_MS });
+ * SKIP when Docker (the docker command and its daemon) is not available. runCommand: the tests' stand-in for run */
+async function checkServerImage(projectPath, { docker = 'docker', runCommand = run } = {}) {
+    const info = await runCommand(docker, ['info', '--format', '{{.ServerVersion}}'], { timeout: DOCKER_INFO_TIMEOUT_MS });
     if (info.error) return { status: 'SKIP', detail: 'Docker is not available' };
-    const build = await run(docker, ['build', '--quiet', '-f', path.join(SERVER_DIR, 'deploy', 'Dockerfile'), SERVER_DIR],
+    const build = await runCommand(docker, ['build', '--quiet', '-f', path.join(SERVER_DIR, 'deploy', 'Dockerfile'), SERVER_DIR],
         { cwd: projectPath, timeout: DOCKER_BUILD_TIMEOUT_MS });
     if (build.error) {
+        if (timedOut(build.error)) return { status: 'FAIL', detail: BUILD_TIMED_OUT };
         const tail = `${build.stderr || build.error.message}`.trim().split('\n').slice(-5).join(' | ');
         return { status: 'FAIL', detail: tail };
     }
     // The image itself is not kept (the build cache is)
     const image = build.stdout.trim().split('\n').pop();
-    if (image) await run(docker, ['image', 'rm', image], { timeout: DOCKER_INFO_TIMEOUT_MS });
+    if (image) await runCommand(docker, ['image', 'rm', image], { timeout: DOCKER_INFO_TIMEOUT_MS });
     return { status: 'PASS', detail: image };
 }
 
@@ -821,6 +841,9 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
     // 14. Backend: the server and its modules exactly when blank's backend flag is on, no residue otherwise
     await verifyBackend(projectPath, input, input.featuresConfig || {}, problems);
 
+    // 14b. No purchases or ads marker line left in a Kotlin file
+    await verifyMonetizationMarkers(projectPath, problems);
+
     // 15. One app version for both platforms
     await verifyAppVersion(projectPath, problems);
 
@@ -840,4 +863,4 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
     }
 }
 
-module.exports = { verifyGeneratedProject, verifyBackend, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };
+module.exports = { verifyGeneratedProject, verifyBackend, verifyMonetizationMarkers, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };

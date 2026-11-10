@@ -266,6 +266,20 @@ test('backendOnFetchesThePinnedBackendTemplate', async (t) => {
     assert.deepStrictEqual(progress, ['Downloading the server template (first run only)', 'Downloading the template (first run only)', 'Generating the project']);
 });
 
+test('aCustomRemoteUrlDoesNotRedirectTheServerTemplate', async (t) => {
+    const { opts, calls, run } = await backendSetup(t);
+    assert.ok(opts.remoteUrl);
+    const r = await run(BACKEND_ON);
+    assert.notStrictEqual(r.isError, true, r.content?.[0]?.text);
+    const backendReqs = calls.filter((c) => c.repo === core.pins.backend.repo);
+    const cmpReqs = calls.filter((c) => c.repo === core.pins.cmp.repo);
+    assert.strictEqual(backendReqs.length, 1);
+    assert.strictEqual(cmpReqs.length, 1);
+    // remoteUrl names the CMP template's remote only
+    assert.strictEqual(backendReqs[0].remoteUrl, undefined);
+    assert.strictEqual(cmpReqs[0].remoteUrl, opts.remoteUrl);
+});
+
 test('backendTemplateRefOverridesThePin', async (t) => {
     const { backendCalls, seen, run } = await backendSetup(t);
     const r = await run({ ...BACKEND_ON, backendTemplateRef: 'backend-template-2026.01.01' });

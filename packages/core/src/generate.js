@@ -11,6 +11,7 @@ const {
 const { applyBlankShell, cloneFeatureModules, assertTemplateCapabilities } = require('./featureModules');
 const { SHOWCASE_FEATURES } = require('./showcaseModules');
 const { applyCiOption } = require('./ciOption');
+const { applyMonetizationMarkers } = require('./monetizationMarkers');
 const { applyBackendOption } = require('./backendOption');
 const { writePrivacyManifest } = require('./privacyManifest');
 const { fillReadme } = require('./readmeService');
@@ -92,6 +93,11 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
         await wireFeatureModules(projectDir, packageName, sanitizedFeatures);
         log.info(`✅ Wired ${sanitizedFeatures.length} feature modules`);
     }
+
+    // The purchases and ads blocks in the Kotlin sources follow blank's flags; showcase keeps both (markers dropped)
+    await applyMonetizationMarkers(projectDir, templateType === 'blank'
+        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true }
+        : { purchases: true, ads: true });
 
     // The CI workflow is opt-in; after processBlankApp, which drops its detekt step when detekt is off
     await applyCiOption(projectDir, ci);

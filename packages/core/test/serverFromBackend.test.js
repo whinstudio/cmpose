@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const os = require('os');
 const path = require('path');
 const fs = require('fs-extra');
-const { deriveServerAppName, placeServer } = require('../src/serverFromBackend');
+const { deriveServerAppName, placeServer, INCLUDE_SERVER_BUILD } = require('../src/serverFromBackend');
 const { validateBackend } = require('../src/backend/validate');
 const { fixtureCopy, read, exists } = require('./backend-helpers');
 
@@ -116,4 +116,27 @@ test('placeServer refuses a project that already has server/', async (t) => {
         placeServer(projectDir, { packageName: 'com.example.demo', projectName: 'Demo', backendTemplate: { dir: raw, ...TEMPLATE } }),
         /server\/ already exists/);
     assert.ok(await fs.pathExists(raw));
+});
+
+test('aFailedPlacementLeavesNoServerDir', async (t) => {
+    // generateBackend fails after the move: the template predates the sample option
+    const raw = await fixtureCopy(t);
+    await fs.remove(path.join(raw, 'tools', 'sample-paths.txt'));
+    const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-place-'));
+    t.after(() => fs.remove(projectDir));
+    await assert.rejects(
+        placeServer(projectDir, { packageName: 'com.example.demo', projectName: 'Demo', backendTemplate: { dir: raw, ...TEMPLATE } }),
+        /predates the sample option/);
+    assert.equal(await fs.pathExists(path.join(projectDir, 'server')), false);
+    assert.deepEqual(await fs.readdir(projectDir), []);
+});
+
+test('includeBuildPatternMatchesOnlyALiveLine', () => {
+    assert.ok(INCLUDE_SERVER_BUILD.test('includeBuild("server")'));
+    assert.ok(INCLUDE_SERVER_BUILD.test('if (file("server/settings.gradle.kts").exists()) includeBuild("server")'));
+    assert.ok(INCLUDE_SERVER_BUILD.test('includeBuild("server") // the backend'));
+    assert.ok(INCLUDE_SERVER_BUILD.test('rootProject.name = "Demo"\n// includeBuild("server")\nincludeBuild("server")\n'));
+    assert.equal(INCLUDE_SERVER_BUILD.test('// includeBuild("server")'), false);
+    assert.equal(INCLUDE_SERVER_BUILD.test('    // includeBuild("server")'), false);
+    assert.equal(INCLUDE_SERVER_BUILD.test('rootProject.name = "Demo"\n\t// includeBuild("server")\n'), false);
 });

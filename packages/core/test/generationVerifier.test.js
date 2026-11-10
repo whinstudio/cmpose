@@ -1674,6 +1674,27 @@ test('checkServerImage FAIL: the last five stderr lines, joined with | (backend)
     });
 });
 
+test('aTimedOutImageBuildSaysBuildKitMayStillRun', async () => {
+    await withProject(async (dir) => {
+        // run resolves with execFile's error; a timeout kills the client with SIGTERM and sets killed
+        const runCommand = async (command, args) => {
+            if (args[0] === 'info') return { error: null, stdout: '27.0.0\n', stderr: '' };
+            const error = Object.assign(new Error('Command failed: docker build'), { killed: true, signal: 'SIGTERM', code: null });
+            return { error, stdout: '', stderr: '#5 building\n' };
+        };
+        const result = await checkServerImage(dir, { runCommand });
+        assert.equal(result.status, 'FAIL');
+        assert.match(result.detail, /timed out after 30 min/);
+        assert.match(result.detail, /BuildKit build may still be running/);
+        assert.match(result.detail, /docker buildx stop/);
+        // a failure that is not a timeout keeps its log tail
+        const failing = async (command, args) => (args[0] === 'info'
+            ? { error: null, stdout: '27.0.0\n', stderr: '' }
+            : { error: Object.assign(new Error('Command failed'), { killed: false, signal: null, code: 1 }), stdout: '', stderr: 'step failed\n' });
+        assert.deepEqual(await checkServerImage(dir, { runCommand: failing }), { status: 'FAIL', detail: 'step failed' });
+    });
+});
+
 // Insights: core/insights, its iOS bridge and the Crashlytics and Analytics products exactly when the flag is on
 // (showcase: when its template has core/insights); with core/about, the privacy manifest declares its data then
 const INSIGHTS_INPUT = (insights, extra = {}) => ({ ...INPUT, featuresConfig: { theming: false, multiLang: false, insights, ...extra } });

@@ -14,7 +14,8 @@ function quotasConvention(sharing) {
 }
 
 /** What the Ktor backend generator offers, plus the rules an AI client follows when it writes code in the project.
- * sharing false describes a project without sharing; left out, the conventions cover both. */
+ * sharing false changes only the quotas convention (no space, member or invite quotas); routes, requireRole,
+ * notFoundRule and newTable read the same either way. Left out, the quotas cover both. */
 function describeBackend({ sharing } = {}) {
     const port = S.anatomy.localPort;
     return {
