@@ -5,6 +5,7 @@ const { log } = require('./log');
 const { listTextFiles } = require('./projectFiles');
 const { escapeRegExp, findResidue, backendResidueTokens, INSIGHTS_DIR, INSIGHTS_FIREBASE_PRODUCTS } = require('./fileService');
 const { TEST_SOURCE_SET_REGEX, BLANK_KEPT_TEST_DIRS } = require('./featureModules');
+const { TAGS: FEATURE_TAGS, INFO_PLIST } = require('./featureMarkers');
 const { OLD_PACKAGE_NAME } = require('./templateIdentity');
 const { SERVER_DIR, INCLUDE_SERVER_BUILD, serverPackageOf } = require('./serverFromBackend');
 
@@ -641,17 +642,22 @@ async function verifyBackend(projectPath, input, cfg, problems) {
     }
 }
 
-// The purchases and ads blocks are resolved in every Kotlin file (applyMonetizationMarkers): a marker line left
-// means a file the walk missed
-const MONETIZATION_MARKERS = ['// cmpose:purchases', '// /cmpose:purchases', '// cmpose:ads', '// /cmpose:ads'];
-const MONETIZATION_MARKER_FILES = new Set(['.kt', '.kts']);
+// The purchases, ads and insights blocks are resolved in every Kotlin file and in Info.plist (applyFeatureMarkers): a
+// marker line left means a file the walk missed
+const SLASH_FEATURE_MARKERS = FEATURE_TAGS.flatMap((tag) => [`// cmpose:${tag}`, `// /cmpose:${tag}`]);
+const XML_FEATURE_MARKERS = FEATURE_TAGS.flatMap((tag) => [`<!-- cmpose:${tag} -->`, `<!-- /cmpose:${tag} -->`]);
+const FEATURE_MARKER_FILES = new Set(['.kt', '.kts']);
+const INFO_PLIST_REL = INFO_PLIST.join('/');
 
-async function verifyMonetizationMarkers(projectPath, problems) {
+async function verifyFeatureMarkers(projectPath, problems) {
     for (const file of await listTextFiles(projectPath)) {
-        if (!MONETIZATION_MARKER_FILES.has(path.extname(file))) continue;
+        const rel = relPath(projectPath, file);
+        const markers = FEATURE_MARKER_FILES.has(path.extname(file)) ? SLASH_FEATURE_MARKERS
+            : rel === INFO_PLIST_REL ? XML_FEATURE_MARKERS : null;
+        if (!markers) continue;
         for (const line of (await fs.readFile(file, 'utf8')).split('\n')) {
-            const marker = MONETIZATION_MARKERS.find((m) => line.trim().startsWith(m));
-            if (marker) problems.add(`${relPath(projectPath, file)}: ${marker} marker left`);
+            const marker = markers.find((m) => line.trim().startsWith(m));
+            if (marker) problems.add(`${rel}: ${marker} marker left`);
         }
     }
 }
@@ -841,8 +847,8 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
     // 14. Backend: the server and its modules exactly when blank's backend flag is on, no residue otherwise
     await verifyBackend(projectPath, input, input.featuresConfig || {}, problems);
 
-    // 14b. No purchases or ads marker line left in a Kotlin file
-    await verifyMonetizationMarkers(projectPath, problems);
+    // 14b. No purchases, ads or insights marker line left in a Kotlin file or Info.plist
+    await verifyFeatureMarkers(projectPath, problems);
 
     // 15. One app version for both platforms
     await verifyAppVersion(projectPath, problems);
@@ -863,4 +869,4 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
     }
 }
 
-module.exports = { verifyGeneratedProject, verifyBackend, verifyMonetizationMarkers, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };
+module.exports = { verifyGeneratedProject, verifyBackend, verifyFeatureMarkers, verifyAppVersion, checkServerImage, resolveServerImageCheck, SERVER_IMAGE_ENV };

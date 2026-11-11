@@ -16,7 +16,7 @@ const {
 } = require('../src/fileService');
 const { applyBlankShell, cloneFeatureModules } = require('../src/featureModules');
 const { applyBackendOption } = require('../src/backendOption');
-const { applyMonetizationMarkers } = require('../src/monetizationMarkers');
+const { applyFeatureMarkers } = require('../src/featureMarkers');
 const CONFIG = { oldPackageName: require('../src/templateIdentity').OLD_PACKAGE_NAME, oldProjectName: require('../src/templateIdentity').OLD_PROJECT_NAME };
 
 // Real template: a checkout named by CMP_REAL_TEMPLATE_DIR; skipped when it is unset or absent
@@ -157,15 +157,15 @@ const templateFiles = (src) => {
     return path.basename(src) !== '.git' && !MAINTAINER_ONLY.some((excluded) => rel === excluded || rel.startsWith(`${excluded}/`));
 };
 
-// The generator's order (src/generate.js): shell, backend, modules, monetization markers, rename, move, blank, wire,
+// The generator's order (src/generate.js): shell, backend, modules, feature markers, rename, move, blank, wire,
 // iOS, then the import pass
 async function generateLikeController(dir, { packageName, templateType, features, featuresConfig }) {
     await applyBlankShell(dir, templateType, featuresConfig);
     await applyBackendOption(dir, templateType === 'blank' && featuresConfig.backend === true);
     await cloneFeatureModules(dir, features);
-    await applyMonetizationMarkers(dir, templateType === 'blank'
-        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true }
-        : { purchases: true, ads: true });
+    await applyFeatureMarkers(dir, templateType === 'blank'
+        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true, insights: featuresConfig.insights === true }
+        : { purchases: true, ads: true, insights: true });
     await processAllFiles(dir, CONFIG.oldPackageName, packageName, CONFIG.oldProjectName, 'Sorted', 'Sorted App',
         { minSdk: '24', iosVersion: '15.0' });
     await movePackageStructure(dir, CONFIG.oldPackageName, packageName);

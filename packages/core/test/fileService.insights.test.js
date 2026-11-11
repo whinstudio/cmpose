@@ -281,7 +281,30 @@ test('assertNoInsightsResidue: each wiring line left over is named', async (t) =
         ['core/sample/build.gradle.kts', 'implementation(libs.crashkios.crashlytics)\n', 'libs.crashkios'],
         [PBXPROJ, 'productName = FirebaseAnalytics;\n', 'FirebaseAnalytics'],
         [PBXPROJ, 'name = "Upload Crashlytics symbols if configured";\n', 'Upload Crashlytics symbols'],
-        ['README.md', '<!-- cmpose:insights -->\n', 'cmpose:insights']
+        ['README.md', '<!-- cmpose:insights -->\n', 'cmpose:insights'],
+        // The consent wiring: Kotlin marker blocks (applyFeatureMarkers) and Info.plist's Analytics key
+        [`shared/src/commonMain/kotlin/${PKG}/GuideScreen.kt`, '// cmpose:insights\n', 'cmpose:insights'],
+        ['feature/account/presentation/build.gradle.kts', '// /cmpose:insights\n', 'cmpose:insights'],
+        ['iosApp/iosApp/Info.plist', '<!-- cmpose:insights -->\n', 'cmpose:insights'],
+        ['iosApp/iosApp/Info.plist', '<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key>\n<false/>\n', 'FIREBASE_ANALYTICS_COLLECTION_ENABLED'],
+        ['androidApp/src/main/AndroidManifest.xml',
+            '<meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />\n',
+            'firebase_analytics_collection_enabled'],
+        [`shared/src/commonMain/kotlin/${PKG}/GuideScreen.kt`, 'InsightsConsentSettings(Modifier)\n', 'InsightsConsentSettings'],
+        [`shared/src/commonMain/kotlin/${PKG}/MainScreen.kt`, 'InsightsConsentDialog()\n', 'InsightsConsentDialog'],
+        [`shared/src/commonMain/kotlin/${PKG}/MainScreen.kt`, 'LocalInsightsConsentTexts provides texts\n', 'LocalInsightsConsentTexts'],
+        [`shared/src/commonMain/kotlin/${PKG}/MainScreen.kt`, 'val texts: InsightsConsentTexts = x\n', 'InsightsConsentTexts'],
+        [`shared/src/commonMain/kotlin/${PKG}/Consent.kt`, 'val c: InsightsConsentController = get()\n', 'InsightsConsentController'],
+        [`shared/src/commonMain/kotlin/${PKG}/Consent.kt`, 'val s: InsightsConsentStore = get()\n', 'InsightsConsentStore'],
+        [`shared/src/commonMain/kotlin/${PKG}/Consent.kt`, 'val a = AnalyticsConsent.Unknown\n', 'AnalyticsConsent'],
+        [`shared/src/androidMain/kotlin/${PKG}/Consent.kt`, 'SharedPreferencesConsentStore(p)\n', 'SharedPreferencesConsentStore'],
+        [`shared/src/iosMain/kotlin/${PKG}/Consent.kt`, 'UserDefaultsConsentStore()\n', 'UserDefaultsConsentStore'],
+        [`shared/src/commonMain/kotlin/${PKG}/Consent.kt`, 'InMemoryConsentStore()\n', 'InMemoryConsentStore'],
+        [`shared/src/commonMain/kotlin/${PKG}/Consent.kt`, 'platformConsentStore()\n', 'platformConsentStore'],
+        [`core/multilang/src/commonMain/kotlin/${PKG}/core/multilang/resource/StringResourcesUiModel.kt`,
+            '    val insightsPromptTitle: String,\n', 'insights consent strings'],
+        [`shared/src/commonMain/kotlin/${PKG}/MainScreen.kt`, 'private fun StringResourcesUiModel.insightsConsentTexts() = x\n',
+            'insights consent strings']
     ];
     for (const [rel, content, label] of cases) {
         await fs.emptyDir(dir);
@@ -304,7 +327,9 @@ test('assertNoInsightsResidue: a custom module named insights and a package spel
         'shared/build.gradle.kts': 'implementation(projects.feature.insights.presentation)\n',
         [INIT_KOIN]: 'import dev.cmpose.app.feature.insights.presentation.di.InsightsPresentationModule\n\nfun m() = add(InsightsPresentationModule().module)\n',
         [`feature/insights/presentation/src/commonMain/kotlin/${PKG}/feature/insights/presentation/InsightsModule.kt`]:
-            'package dev.cmpose.app.feature.insights.presentation\n\nclass InsightsModule\n'
+            'package dev.cmpose.app.feature.insights.presentation\n\nclass InsightsModule\n',
+        // An app named after the Analytics key: the plist spells it as a value, never as the <key>
+        'iosApp/iosApp/Info.plist': '<key>CFBundleDisplayName</key>\n<string>FIREBASE_ANALYTICS_COLLECTION_ENABLED</string>\n'
     };
     for (const [rel, content] of Object.entries(files)) await fs.outputFile(path.join(dir, rel), content);
     await assertNoInsightsResidue(dir, NEW_PACKAGE, { insights: false });

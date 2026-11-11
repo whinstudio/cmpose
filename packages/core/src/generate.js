@@ -11,7 +11,7 @@ const {
 const { applyBlankShell, cloneFeatureModules, assertTemplateCapabilities } = require('./featureModules');
 const { SHOWCASE_FEATURES } = require('./showcaseModules');
 const { applyCiOption } = require('./ciOption');
-const { applyMonetizationMarkers } = require('./monetizationMarkers');
+const { applyFeatureMarkers } = require('./featureMarkers');
 const { applyBackendOption } = require('./backendOption');
 const { writePrivacyManifest } = require('./privacyManifest');
 const { fillReadme } = require('./readmeService');
@@ -76,11 +76,12 @@ async function generateCmpProject(value, { projectDir, generatorVersion = null, 
     // Firebase setup it shares with insights stays while either is on.
     await applyBackendOption(projectDir, { enabled: backendOn, firebase: backendOn || insightsOn });
     await cloneFeatureModules(projectDir, sanitizedFeatures);
-    // The purchases and ads blocks in the Kotlin sources follow blank's flags; showcase keeps both (markers dropped).
-    // Before processBlankApp: its monetization residue check must not see the text of a block that goes.
-    await applyMonetizationMarkers(projectDir, templateType === 'blank'
-        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true }
-        : { purchases: true, ads: true });
+    // The purchases, ads and insights blocks in the Kotlin sources (and Info.plist's insights block) follow blank's
+    // flags; showcase keeps purchases and ads, and insights while its template has it (markers dropped). Before
+    // processBlankApp: its residue checks must not see the text of a block that goes.
+    await applyFeatureMarkers(projectDir, templateType === 'blank'
+        ? { purchases: featuresConfig.purchases === true, ads: featuresConfig.ads === true, insights: insightsOn }
+        : { purchases: true, ads: true, insights: insightsOn });
     log.info(`✅ Template skeleton ready (${sanitizedFeatures.length} feature modules)`);
 
     await processAllFiles(projectDir, OLD_PACKAGE_NAME, packageName, OLD_PROJECT_NAME, projectName, appName, { minSdk, iosVersion });
