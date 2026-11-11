@@ -164,8 +164,7 @@ test('real template, blank, backend on and insights on: both stay', BACKEND_OPTI
         await assertConsentKept(projectDir, { multiLang: true });
         assert.match(await read(projectDir, ACCOUNT_BUILD), /^\s+implementation\(projects\.core\.insights\)$/m);
         const settings = await read(projectDir, ACCOUNT_SETTINGS);
-        assert.match(settings, /^import com\.example\.demo\.core\.insights\.consent\.ui\.InsightsConsentSettings$/m);
-        assert.match(settings, /^\s+InsightsConsentSettings\(\)$/m);
+        assert.match(settings, /^\s+com\.example\.demo\.core\.insights\.consent\.ui\.InsightsConsentSettings\(\)$/m);
     }
 });
 
