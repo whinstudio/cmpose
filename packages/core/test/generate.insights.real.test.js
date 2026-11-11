@@ -31,6 +31,19 @@ const TOML = 'gradle/libs.versions.toml';
 // CrashKiOS's catalog keys (the version key itself spells no residue token)
 const CRASHKIOS_KEY = /^crashkios(?:-crashlytics)?\s*=/m;
 const TEMPLATE_HAS_CRASHKIOS = HAS_TEMPLATE && CRASHKIOS_KEY.test(fs.readFileSync(path.join(REAL, TOML), 'utf8'));
+// The consent prompt and switches (cmpose:insights blocks in Kotlin and in Info.plist); an older template has neither
+const INFO_PLIST = 'iosApp/iosApp/Info.plist';
+const TEMPLATE_HAS_CONSENT = HAS_TEMPLATE && fs.readFileSync(path.join(REAL, INFO_PLIST), 'utf8').includes('<!-- cmpose:insights -->');
+const CONSENT_OPTIONS = !HAS_TEMPLATE ? TEMPLATE_OPTIONS
+    : TEMPLATE_HAS_CONSENT ? {} : { skip: `the template at CMP_REAL_TEMPLATE_DIR (${REAL}) predates the consent prompt` };
+const CONSENT_BACKEND_OPTIONS = Object.keys(CONSENT_OPTIONS).length ? CONSENT_OPTIONS : BACKEND_OPTIONS;
+const SRC = 'shared/src/commonMain/kotlin/com/example/demo';
+const MAIN_SCREEN = `${SRC}/MainScreen.kt`;
+const GUIDE_SCREEN = `${SRC}/GuideScreen.kt`;
+const ACCOUNT_BUILD = 'feature/account/presentation/build.gradle.kts';
+const ACCOUNT_SETTINGS = 'feature/account/presentation/src/commonMain/kotlin/com/example/demo/feature/account/presentation/ui/settings/SettingsScreen.kt';
+const STRINGS = 'core/multilang/src/commonMain/kotlin/com/example/demo/core/multilang/resource/StringResourcesUiModel.kt';
+const ANALYTICS_KEY = /<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED<\/key>\s*<false\/>/;
 
 async function generate(t, request) {
     const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-insights-real-'));
@@ -70,6 +83,30 @@ async function residue(projectDir) {
         }
     }
     return found;
+}
+
+// Each Kotlin source and plist still spelling a cmpose:insights marker (the README keeps its own markers)
+async function insightsMarkers(projectDir) {
+    const found = [];
+    for (const file of await listTextFiles(projectDir)) {
+        if (!['.kt', '.kts', '.plist'].includes(path.extname(file))) continue;
+        if ((await fs.readFile(file, 'utf8')).includes('cmpose:insights')) found.push(path.relative(projectDir, file));
+    }
+    return found;
+}
+
+// The consent prompt (MainScreen), the switches (GuideScreen's About dialog) and Info.plist's Analytics key
+async function assertConsentKept(projectDir, { multiLang = false } = {}) {
+    assert.deepEqual(await insightsMarkers(projectDir), []);
+    const mainScreen = await read(projectDir, MAIN_SCREEN);
+    assert.match(mainScreen, /^import com\.example\.demo\.core\.insights\.consent\.ui\.InsightsConsentDialog$/m);
+    assert.match(mainScreen, /^\s+InsightsConsentDialog\(\)$/m);
+    assert.match(await read(projectDir, GUIDE_SCREEN), /^\s+InsightsConsentSettings\(/m);
+    assert.match(await read(projectDir, INFO_PLIST), ANALYTICS_KEY);
+    if (multiLang) {
+        assert.match(mainScreen, /LocalInsightsConsentTexts provides/);
+        assert.match(await read(projectDir, STRINGS), /\binsightsPromptTitle\b/);
+    }
 }
 
 async function assertInsightsOff(projectDir) {
@@ -123,10 +160,55 @@ test('real template, blank, backend on and insights on: both stay', BACKEND_OPTI
     const projectDir = await generate(t, { templateType: 'blank', featuresConfig: { backend: true, insights: true } });
     await assertInsightsOn(projectDir);
     assert.ok((await read(projectDir, PBXPROJ)).includes('productName = FirebaseAuth;'));
+    if (TEMPLATE_HAS_CONSENT) {
+        await assertConsentKept(projectDir, { multiLang: true });
+        assert.match(await read(projectDir, ACCOUNT_BUILD), /^\s+implementation\(projects\.core\.insights\)$/m);
+        const settings = await read(projectDir, ACCOUNT_SETTINGS);
+        assert.match(settings, /^\s+com\.example\.demo\.core\.insights\.consent\.ui\.InsightsConsentSettings\(\)$/m);
+    }
 });
 
 test('real template, showcase keeps insights', TEMPLATE_OPTIONS, async (t) => {
     const projectDir = await generate(t, { templateType: 'showcase' });
     await assertInsightsOn(projectDir);
     assert.ok(!(await read(projectDir, PBXPROJ)).includes('FirebaseAuth'), 'FirebaseAuth left in a showcase project.pbxproj');
+    if (TEMPLATE_HAS_CONSENT) {
+        assert.deepEqual(await insightsMarkers(projectDir), []);
+        assert.match(await read(projectDir, INFO_PLIST), ANALYTICS_KEY);
+    }
+});
+
+// Review focus: with the backend on and insights off, the account settings keep no consent row and no core.insights
+test('real template, blank insights off + backend on leaves no consent rows', CONSENT_BACKEND_OPTIONS, async (t) => {
+    const projectDir = await generate(t, { templateType: 'blank', featuresConfig: { backend: true, insights: false } });
+    await assertInsightsOff(projectDir);
+    assert.deepEqual(await insightsMarkers(projectDir), []);
+    const settings = await read(projectDir, ACCOUNT_SETTINGS);
+    assert.doesNotMatch(settings, /InsightsConsent|core\.insights/);
+    // Only the insights blocks went: the legal links row the switches sat above stays
+    assert.match(settings, /\bLegalLinksRow\(/);
+    assert.doesNotMatch(await read(projectDir, ACCOUNT_BUILD), /insights/);
+    for (const rel of [MAIN_SCREEN, GUIDE_SCREEN, STRINGS]) {
+        assert.doesNotMatch(await read(projectDir, rel), /InsightsConsent|\binsights[A-Z]|core\.insights/, rel);
+    }
+    assert.doesNotMatch(await read(projectDir, INFO_PLIST), /FIREBASE_ANALYTICS_COLLECTION_ENABLED/);
+});
+
+test('real template, blank insights on keeps the consent dialog without markers', CONSENT_OPTIONS, async (t) => {
+    for (const multiLang of [false, true]) {
+        const projectDir = await generate(t, { templateType: 'blank', featuresConfig: { insights: true, multiLang } });
+        await assertInsightsOn(projectDir);
+        await assertConsentKept(projectDir, { multiLang });
+    }
+});
+
+// Review focus: the consent store is the platform's own (SharedPreferences, NSUserDefaults), never core/database
+test('real template, dataStore off + insights on generates and verifies', CONSENT_OPTIONS, async (t) => {
+    const projectDir = await generate(t, { templateType: 'blank',
+        featuresConfig: { dataStore: false, theming: false, multiLang: false, network: false, insights: true } });
+    await assertInsightsOn(projectDir);
+    await assertConsentKept(projectDir);
+    assert.equal(await exists(projectDir, 'core/database'), false);
+    assert.doesNotMatch(await read(projectDir, 'settings.gradle.kts'), /core:database/);
+    assert.doesNotMatch(await read(projectDir, 'core/insights/build.gradle.kts'), /core\.database|datastore/i);
 });

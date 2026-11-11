@@ -884,6 +884,24 @@ async function processBlankApp(projectPath, packageName, features, featuresConfi
     const packagePath = packageName.replace(/\./g, '/');
     const commonMainPath = path.join(projectPath, 'shared', 'src', 'commonMain', 'kotlin', packagePath);
 
+    // The template's own core tests (ThemeModeTest, ColorSchemeForTest, ...) stay in the showcase.
+    // Compass counts every iOS test of a project as the agent's, so a blank app starts with none
+    // (clones carry none either, see featureModules.js). The Android-host checks of BLANK_KEPT_TEST_DIRS stay:
+    // shared's Koin graph check and, with the backend, core/api's contract test against server/.
+    // The same goes for the layers of the template's own feature modules (monetization, notes, account, sharing).
+    // First: the residue checks below look at the project as it ships, not at a template test that goes anyway
+    // (core/multilang's InsightsConsentStringsTest with insights off).
+    const testParents = [
+        path.join(projectPath, 'core'),
+        ...Object.keys(TEMPLATE_FEATURE_MODULES).map((module) => path.join(projectPath, 'feature', module))
+    ];
+    for (const parentDir of testParents) {
+        if (!(await fs.pathExists(parentDir))) continue;
+        for (const moduleName of await fs.readdir(parentDir)) {
+            await removeTestSourceSets(projectPath, path.join(parentDir, moduleName));
+        }
+    }
+
     // 0. Process Core Features (Network, etc.)
     if (featuresConfig) {
         await processCoreFeatures(projectPath, featuresConfig, packageName);
@@ -937,22 +955,6 @@ async function processBlankApp(projectPath, packageName, features, featuresConfi
     await fs.remove(path.join(designSystemPath, 'component'));
     await fs.remove(path.join(designSystemPath, 'icon'));
     log.info('✅ Cleaned up core/designsystem (component & icon)');
-
-    // The template's own core tests (ThemeModeTest, ColorSchemeForTest, ...) stay in the showcase.
-    // Compass counts every iOS test of a project as the agent's, so a blank app starts with none
-    // (clones carry none either, see featureModules.js). The Android-host checks of BLANK_KEPT_TEST_DIRS stay:
-    // shared's Koin graph check and, with the backend, core/api's contract test against server/.
-    // The same goes for the layers of the template's own feature modules (monetization, notes, account, sharing).
-    const testParents = [
-        path.join(projectPath, 'core'),
-        ...Object.keys(TEMPLATE_FEATURE_MODULES).map((module) => path.join(projectPath, 'feature', module))
-    ];
-    for (const parentDir of testParents) {
-        if (!(await fs.pathExists(parentDir))) continue;
-        for (const moduleName of await fs.readdir(parentDir)) {
-            await removeTestSourceSets(projectPath, path.join(parentDir, moduleName));
-        }
-    }
 
     // Remove DesignSystem module entirely if neither theming nor multilanguage is selected
     if (featuresConfig && featuresConfig.theming !== true && featuresConfig.multiLang !== true) {
@@ -1352,9 +1354,21 @@ const INSIGHTS_RESIDUE_TOKENS = [
     code(/\bFirebaseCrashlytics\b/, 'FirebaseCrashlytics', BACKEND_IOS_EXTENSIONS),
     code(/\bFirebaseAnalytics\b/, 'FirebaseAnalytics', BACKEND_IOS_EXTENSIONS),
     code(/Upload Crashlytics symbols/, 'Upload Crashlytics symbols', PBXPROJ),
-    code(/cmpose:insights/, 'cmpose:insights', new Set([...BACKEND_IOS_EXTENSIONS, '.md'])),
+    // Any marker left: the Kotlin and Info.plist blocks are applyFeatureMarkers', the README's processCoreFeatures'
+    code(/cmpose:insights/, 'cmpose:insights', new Set([...BACKEND_IOS_EXTENSIONS, '.md', '.plist'])),
+    // Analytics starts off until the user agrees: Info.plist's key (as a <key>, which the app name cannot spell) and
+    // the manifest's meta-data (core/insights' own manifest goes with the module)
+    code(/<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED<\/key>/, 'FIREBASE_ANALYTICS_COLLECTION_ENABLED', PLIST),
+    code(/android:name="firebase_analytics_collection_enabled"/, 'firebase_analytics_collection_enabled', XML),
+    // The consent prompt's texts in core/multilang and the mapper the multilang MainScreen hands them out with
+    code(/\binsights(?:Prompt(?:Title|Message)|Allow|Deny|SettingsTitle|Analytics(?:Description)?|CrashReports(?:Description)?|ConsentTexts)\b/,
+        'insights consent strings'),
     ...['IosInsightsBridge', 'IosInsights', 'InsightsBridge', 'InsightsBridgeRegistrationKt', 'registerInsightsBridge',
-        'installInsightsLogging', 'InsightsModule', 'InsightsLogWriter'].map(insightsClass)
+        'installInsightsLogging', 'InsightsModule', 'InsightsLogWriter',
+        // The analytics consent (core/insights' consent package): the prompt, the switches and their state
+        'InsightsConsentController', 'InsightsConsentStore', 'AnalyticsConsent', 'InsightsConsentDialog',
+        'InsightsConsentSettings', 'InsightsConsentTexts', 'LocalInsightsConsentTexts', 'platformConsentStore',
+        'SharedPreferencesConsentStore', 'UserDefaultsConsentStore', 'InMemoryConsentStore'].map(insightsClass)
 ];
 const INSIGHTS_RESIDUE_FILES = (packagePath) => [
     INSIGHTS_DIR,

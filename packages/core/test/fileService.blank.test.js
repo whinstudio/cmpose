@@ -326,6 +326,20 @@ test("blank drops the template's core tests but keeps shared's Koin graph check 
     });
 });
 
+// A template test that blank drops never fails a residue check: the tests go before the checks run (core/multilang's
+// test of the consent strings, with insights off)
+test("blank's residue checks do not see the template's core tests", async (t) => {
+    t.mock.method(console, 'log', () => { });
+    await withTempDir(async (dir) => {
+        await seed(dir);
+        const consentTest = `core/multilang/src/commonTest/kotlin/${PKG}/core/multilang/resource/InsightsConsentStringsTest.kt`;
+        await fs.outputFile(path.join(dir, consentTest),
+            `package ${NEW_PACKAGE}.core.multilang.resource\n\n// core/insights' InsightsConsentTexts\nval t = strings.insightsPromptTitle\n`);
+        await processBlankApp(dir, NEW_PACKAGE, [], config({ insights: false }));
+        assert.equal(await exists(dir, 'core/multilang/src/commonTest'), false);
+    });
+});
+
 // core/api is there only with the backend (applyBackendOption deletes it otherwise). Its Android-host contract
 // test checks the app's models and routes against the server/ next to it, so it stays; its commonTest (an iOS
 // test too, which Compass would count as the agent's) goes like every other template test.
