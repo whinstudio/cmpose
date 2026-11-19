@@ -14,6 +14,7 @@ const {
     updateiOSProject,
     updateiOSConfigFiles
 } = require('../src/fileService');
+const { copyRealTemplate } = require('./realTemplate-helpers');
 const { applyBlankShell, cloneFeatureModules } = require('../src/featureModules');
 const { applyBackendOption } = require('../src/backendOption');
 const { applyFeatureMarkers } = require('../src/featureMarkers');
@@ -135,7 +136,7 @@ test('sortKotlinImports sorts the import block, rewrites only changed files, ski
 
 test('sortKotlinImports leaves the real template (package com.kturker.multiplatform) unchanged', HAS_TEMPLATE ? {} : NO_TEMPLATE, async () => {
     await withTempDir(async (dir) => {
-        await fs.copy(REAL, dir, { filter: (src) => path.basename(src) !== '.git' });
+        await copyRealTemplate(REAL, dir);
         const files = await kotlinFiles(dir);
         const before = new Map(await Promise.all(files.map(async (f) => [f, await fs.readFile(f, 'utf8')])));
         assert.ok(files.length > 50, `expected many template .kt files, got ${files.length}`);
@@ -186,7 +187,7 @@ for (const packageName of ['org.example.app', 'tr.com.example.app']) {
             t.mock.method(console, 'log', () => { });
             t.mock.method(console, 'warn', () => { });
             await withTempDir(async (dir) => {
-                await fs.copy(REAL, dir, { filter: templateFiles });
+                await copyRealTemplate(REAL, dir, templateFiles);
                 await generateLikeController(dir, { packageName, templateType, features, featuresConfig });
 
                 await sortKotlinImports(dir);
