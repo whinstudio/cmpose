@@ -29,6 +29,7 @@ test('renderRequirements lists the template versions and the request values', ()
     assert.ok(out.includes('| Android compileSdk / targetSdk | 36 / 36 |'), out);
     assert.ok(out.includes('| Android minSdk | 24 |'), out);
     assert.ok(out.includes('| iOS minimum | 15.0 |'), out);
+    assert.ok(out.split('\n').includes('| Xcode | 26 or newer (App Store uploads need the iOS 26 SDK) |'), out);
     assert.ok(out.includes('Apple Silicon'), out);
 });
 

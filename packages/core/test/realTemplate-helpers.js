@@ -3,11 +3,13 @@ const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs-extra');
 
-// The files git tracks in a work tree (ignored and untracked files left out), or null when it is not one
+// The files git tracks in a work tree (ignored and untracked files left out) when `root` is its top level; null when it
+// is not a work tree or only a subdirectory of another repo
 function trackedFiles(root) {
     try {
-        execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
-        return execFileSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024 })
+        const top = execFileSync('git', ['-C', root, 'rev-parse', '--show-toplevel'], { stdio: 'pipe' }).toString('utf8').trim();
+        if (path.resolve(top) !== fs.realpathSync(root)) return null;
+        return execFileSync('git', ['-C', root, 'ls-files', '-z'], { stdio: 'pipe', maxBuffer: 64 * 1024 * 1024 })
             .toString('utf8').split('\0').filter(Boolean);
     } catch {
         return null;
