@@ -43,7 +43,7 @@ Generating needs only Node.js and git. To build the result:
 | Project | You need |
 |---|---|
 | Compose Multiplatform, Android | Android Studio |
-| Compose Multiplatform, iOS | Xcode 16 or newer; the simulator needs an Apple Silicon Mac |
+| Compose Multiplatform, iOS | Xcode 26 or newer; the simulator needs an Apple Silicon Mac |
 | Unity game | Unity 6 (editor 6000.3.25f1) with Android and iOS Build Support; Xcode for iOS |
 | Ktor backend | JDK 21; Docker to deploy it |
 
@@ -116,6 +116,7 @@ version and pins one tag of each template, so a given version always generates t
 The 5 real-template tests in `packages/core/test/fileService.importSort.test.js` and the ones
 in `generate.insights.real.test.js` run only when `CMP_REAL_TEMPLATE_DIR` points to a checkout of the template, e.g.
 `CMP_REAL_TEMPLATE_DIR=/path/to/template-checkout npm test`; otherwise they are skipped.
+When the directory is a checkout's root, the real-template tests copy only the files git tracks.
 
 `CMPOSE_BACKEND_TEMPLATE_DIR` points to a checkout of the backend template (an absolute path).
 The MCP server then generates from that checkout instead of the pinned tag: `backend_generate`

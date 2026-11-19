@@ -44,7 +44,7 @@ function renderRequirements(versions, { minSdk, iosVersion }) {
         row('Android compileSdk / targetSdk', sdk),
         row('Android minSdk', minSdk),
         row('iOS minimum', iosVersion),
-        row('Xcode', '16 or newer'),
+        row('Xcode', '26 or newer (App Store uploads need the iOS 26 SDK)'),
         '',
         'iOS targets are arm64 only (`iosArm64`, `iosSimulatorArm64`): the simulator needs an Apple Silicon Mac.'
     ].join('\n');
