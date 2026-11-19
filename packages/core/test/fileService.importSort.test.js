@@ -1,7 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const os = require('os');
-const { execFileSync } = require('child_process');
 const path = require('path');
 const fs = require('fs-extra');
 
@@ -15,6 +14,7 @@ const {
     updateiOSProject,
     updateiOSConfigFiles
 } = require('../src/fileService');
+const { copyRealTemplate } = require('./realTemplate-helpers');
 const { applyBlankShell, cloneFeatureModules } = require('../src/featureModules');
 const { applyBackendOption } = require('../src/backendOption');
 const { applyFeatureMarkers } = require('../src/featureMarkers');
@@ -134,27 +134,9 @@ test('sortKotlinImports sorts the import block, rewrites only changed files, ski
     });
 });
 
-// The files git tracks in a work tree (ignored and untracked files left out), or null when it is not one
-function trackedFiles(root) {
-    try {
-        execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' });
-        return execFileSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024 })
-            .toString('utf8').split('\0').filter(Boolean);
-    } catch {
-        return null;
-    }
-}
-
 test('sortKotlinImports leaves the real template (package com.kturker.multiplatform) unchanged', HAS_TEMPLATE ? {} : NO_TEMPLATE, async () => {
     await withTempDir(async (dir) => {
-        const tracked = trackedFiles(REAL);
-        if (tracked) {
-            for (const rel of tracked) {
-                if (fs.existsSync(path.join(REAL, rel))) await fs.copy(path.join(REAL, rel), path.join(dir, rel));
-            }
-        } else {
-            await fs.copy(REAL, dir, { filter: (src) => path.basename(src) !== '.git' });
-        }
+        await copyRealTemplate(REAL, dir);
         const files = await kotlinFiles(dir);
         const before = new Map(await Promise.all(files.map(async (f) => [f, await fs.readFile(f, 'utf8')])));
         assert.ok(files.length > 50, `expected many template .kt files, got ${files.length}`);
@@ -205,7 +187,7 @@ for (const packageName of ['org.example.app', 'tr.com.example.app']) {
             t.mock.method(console, 'log', () => { });
             t.mock.method(console, 'warn', () => { });
             await withTempDir(async (dir) => {
-                await fs.copy(REAL, dir, { filter: templateFiles });
+                await copyRealTemplate(REAL, dir, templateFiles);
                 await generateLikeController(dir, { packageName, templateType, features, featuresConfig });
 
                 await sortKotlinImports(dir);

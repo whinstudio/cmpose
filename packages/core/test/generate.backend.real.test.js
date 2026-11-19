@@ -8,6 +8,7 @@ const { validate } = require('../src/validate');
 const { generateCmpProject } = require('../src/generate');
 const { listTextFiles } = require('../src/projectFiles');
 const { BACKEND_RESIDUE_TOKENS } = require('../src/fileService');
+const { copyRealTemplate } = require('./realTemplate-helpers');
 
 // The whole pipeline against the REAL templates (CMP_REAL_TEMPLATE_DIR, e.g. a `git archive` of the CMP template's
 // branch; CMPOSE_BACKEND_TEMPLATE_DIR, a backend template checkout, which server/ comes from). Skipped, not failed,
@@ -33,11 +34,9 @@ const GMA_PINS = ['swift-package-manager-google-mobile-ads', 'swift-package-mana
 async function generate(t, request) {
     const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-backend-real-'));
     t.after(() => fs.remove(projectDir));
-    await fs.copy(REAL, projectDir, {
-        filter: (src) => {
-            const rel = path.relative(REAL, src).split(path.sep).join('/');
-            return !MAINTAINER_ONLY.some((excluded) => rel === excluded || rel.startsWith(`${excluded}/`));
-        }
+    await copyRealTemplate(REAL, projectDir, (src) => {
+        const rel = path.relative(REAL, src).split(path.sep).join('/');
+        return !MAINTAINER_ONLY.some((excluded) => rel === excluded || rel.startsWith(`${excluded}/`));
     });
     const { ok, value, error } = validate({ appName: 'Demo App', minSdk: '24', iosVersion: '16.0', ...request });
     assert.ok(ok, error);

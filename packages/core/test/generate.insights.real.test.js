@@ -8,6 +8,7 @@ const { validate } = require('../src/validate');
 const { generateCmpProject } = require('../src/generate');
 const { listTextFiles } = require('../src/projectFiles');
 const { INSIGHTS_RESIDUE_TOKENS } = require('../src/fileService');
+const { copyRealTemplate } = require('./realTemplate-helpers');
 
 // The whole pipeline against the REAL templates, for the four backend × insights combinations (CMP_REAL_TEMPLATE_DIR, a
 // `git archive` of the CMP template's branch; CMPOSE_BACKEND_TEMPLATE_DIR, a backend template checkout, for backend on).
@@ -48,11 +49,9 @@ const ANALYTICS_KEY = /<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED<\/key>\s*<fals
 async function generate(t, request) {
     const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cmpose-insights-real-'));
     t.after(() => fs.remove(projectDir));
-    await fs.copy(REAL, projectDir, {
-        filter: (src) => {
-            const rel = path.relative(REAL, src).split(path.sep).join('/');
-            return !MAINTAINER_ONLY.some((excluded) => rel === excluded || rel.startsWith(`${excluded}/`));
-        }
+    await copyRealTemplate(REAL, projectDir, (src) => {
+        const rel = path.relative(REAL, src).split(path.sep).join('/');
+        return !MAINTAINER_ONLY.some((excluded) => rel === excluded || rel.startsWith(`${excluded}/`));
     });
     const { ok, value, error } = validate({ appName: 'Demo App', minSdk: '24', iosVersion: '16.0', projectName: 'Demo',
         packageName: 'com.example.demo', ...request });
