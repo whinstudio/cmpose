@@ -130,6 +130,22 @@ function stripAdsInfoPlist(content) {
         .replace(/\n[ \t]*<key>SKAdNetworkItems<\/key>\s*<array>[\s\S]*?\n[ \t]*<\/array>/, '');
 }
 
+// Ads or multiLang off: the localized ATT purpose strings (iosApp/iosApp/<lang>.lproj/InfoPlist.strings) go; an .lproj
+// folder goes with its file only when nothing else is left in it. Info.plist keeps (ads on) or loses (ads off) the
+// English text on its own. Idempotent; a project without iosApp/iosApp is fine.
+async function removeTrackingStrings(projectPath) {
+    const iosAppDir = path.join(projectPath, 'iosApp', 'iosApp');
+    if (!(await fs.pathExists(iosAppDir))) return;
+    for (const entry of await fs.readdir(iosAppDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || !entry.name.endsWith('.lproj')) continue;
+        const lprojDir = path.join(iosAppDir, entry.name);
+        const stringsFile = path.join(lprojDir, 'InfoPlist.strings');
+        if (!(await fs.pathExists(stringsFile))) continue;
+        await fs.remove(stringsFile);
+        if ((await fs.readdir(lprojDir)).length === 0) await fs.remove(lprojDir);
+    }
+}
+
 // Ads off: the AdMob app ID meta-data (and its comment) in androidApp's AndroidManifest.xml
 function stripAdsManifest(content) {
     return content
@@ -1896,6 +1912,9 @@ async function processCoreFeatures(projectPath, config, packageName) {
         await fs.remove(path.join(projectPath, 'core', 'multilang'));
         log.info('✅ Removed core/multilang');
 
+        // The localized ATT purpose strings: Info.plist's English text is the only one left
+        await removeTrackingStrings(projectPath);
+
         // 2. Remove from settings.gradle.kts
         const settingsGradle = path.join(projectPath, 'settings.gradle.kts');
         if (await fs.pathExists(settingsGradle)) {
@@ -2104,6 +2123,7 @@ async function processCoreFeatures(projectPath, config, packageName) {
         // 4. Platform keys: the AdMob app IDs, ATT and SKAdNetwork
         await rewriteIfExists(path.join(projectPath, 'androidApp', 'src', 'main', 'AndroidManifest.xml'), stripAdsManifest);
         await rewriteIfExists(path.join(projectPath, 'iosApp', 'iosApp', 'Info.plist'), stripAdsInfoPlist);
+        await removeTrackingStrings(projectPath);
 
         // 5. The Google Mobile Ads Swift package. Package.resolved loses the GMA and UMP pins (the
         // backend's stay); with no pin left it goes as a whole (Xcode writes a new one if the user adds a
@@ -2390,6 +2410,7 @@ module.exports = {
     processBlankApp,
     removeTomlEntries,
     stripAdsInfoPlist,
+    removeTrackingStrings,
     stripAdsManifest,
     stripAdsBridgeRegistration,
     assertNoNetworkMonitorResidue,
