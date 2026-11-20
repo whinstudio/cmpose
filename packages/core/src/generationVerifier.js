@@ -189,6 +189,34 @@ async function verifyMonetization(projectPath, packagePath, cfg, problems) {
     }
 }
 
+// The localized ATT purpose strings (iosApp/iosApp/<lang>.lproj/InfoPlist.strings): one per AppLanguage exactly when ads
+// and multiLang are on (showcase: both on); otherwise none, whatever the language. No removal path deletes them while both
+// are on, so a project with none of them comes from a template that predates them (staging, an older tag): not checked.
+const TRACKING_STRINGS_LANGS = ['en', 'tr', 'es', 'it', 'fr'];
+const trackingStringsRel = (lang) => `iosApp/iosApp/${lang}.lproj/InfoPlist.strings`;
+
+async function verifyTrackingStrings(projectPath, input, problems) {
+    const cfg = input.templateType === 'blank' ? (input.featuresConfig || {}) : { ads: true, multiLang: true };
+    if (cfg.ads === true && cfg.multiLang === true) {
+        const missing = [];
+        for (const lang of TRACKING_STRINGS_LANGS) {
+            if (!(await fs.pathExists(path.join(projectPath, trackingStringsRel(lang))))) missing.push(lang);
+        }
+        if (missing.length === TRACKING_STRINGS_LANGS.length) return;
+        for (const lang of missing) problems.add(`${trackingStringsRel(lang)}: missing although ads and multiLang are on`);
+        return;
+    }
+    const iosAppDir = path.join(projectPath, 'iosApp', 'iosApp');
+    if (!(await fs.pathExists(iosAppDir))) return;
+    for (const entry of await fs.readdir(iosAppDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || !entry.name.endsWith('.lproj')) continue;
+        const lang = entry.name.slice(0, -'.lproj'.length);
+        if (await fs.pathExists(path.join(iosAppDir, entry.name, 'InfoPlist.strings'))) {
+            problems.add(`${trackingStringsRel(lang)}: present although ads or multiLang is off`);
+        }
+    }
+}
+
 // Room: blank keeps core/room (Notes only) and feature/notes exactly when its room flag is on; showcase
 // keeps core/room (favorites) only if the template has it and never the Notes demo. Existence and the
 // entity list only — residue inside kept files is assertNoRoomResidue's job.
@@ -846,6 +874,9 @@ async function verifyGeneratedProject(projectPath, input, { serverImageCheck, en
 
     // 14. Backend: the server and its modules exactly when blank's backend flag is on, no residue otherwise
     await verifyBackend(projectPath, input, input.featuresConfig || {}, problems);
+
+    // 14a. The localized ATT purpose strings exactly when ads and multiLang are on
+    await verifyTrackingStrings(projectPath, input, problems);
 
     // 14b. No purchases, ads or insights marker line left in a Kotlin file or Info.plist
     await verifyFeatureMarkers(projectPath, problems);
